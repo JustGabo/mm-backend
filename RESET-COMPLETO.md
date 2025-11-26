@@ -50,3 +50,4 @@ git push -u origin main --force
 
 ¡Listo! Ahora debería funcionar sin problemas.
 
+

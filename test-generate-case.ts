@@ -13,31 +13,45 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 dotenv.config() // .env tiene prioridad sobre .env.local
 
-const API_URL = process.env.API_URL || 'http://localhost:3001'
+// Usar el mismo puerto que el servidor
+const SERVER_PORT = process.env.PORT || 3001
+const API_URL = process.env.API_URL || `http://localhost:${SERVER_PORT}`
 const ENDPOINT = `${API_URL}/api/generate-initial-case`
 
 async function checkServerHealth() {
-  try {
-    const healthResponse = await fetch(`${API_URL}/api/health`)
-    if (healthResponse.ok) {
-      console.log('✅ Servidor está corriendo\n')
-      return true
+  // Intentar primero con el puerto configurado, luego 3000, luego 3001
+  const portsToTry = [SERVER_PORT, 3000, 3001].filter((port, index, self) => self.indexOf(port) === index)
+  
+  for (const port of portsToTry) {
+    try {
+      const testUrl = `http://localhost:${port}/api/health`
+      const healthResponse = await fetch(testUrl)
+      if (healthResponse.ok) {
+        // Actualizar API_URL si encontramos el servidor en otro puerto
+        if (port !== SERVER_PORT) {
+          console.log(`⚠️  Servidor encontrado en puerto ${port} (configurado: ${SERVER_PORT})`)
+          // Actualizar para usar el puerto correcto
+          return { running: true, port }
+        }
+        console.log('✅ Servidor está corriendo\n')
+        return { running: true, port }
+      }
+    } catch (error) {
+      // Continuar al siguiente puerto
+      continue
     }
-  } catch (error) {
-    // Servidor no disponible
   }
-  return false
+  return { running: false, port: null }
 }
 
 async function testGenerateInitialCase() {
   console.log('🧪 Iniciando test de generación de caso inicial...\n')
-  console.log(`📍 Endpoint: ${ENDPOINT}\n`)
 
   // Verificar que el servidor esté corriendo
   console.log('🔍 Verificando que el servidor esté corriendo...')
-  const serverRunning = await checkServerHealth()
+  const serverStatus = await checkServerHealth()
   
-  if (!serverRunning) {
+  if (!serverStatus.running) {
     console.error('❌ El servidor no está corriendo o no responde\n')
     console.log('💡 Para iniciar el servidor, ejecuta en otra terminal:')
     console.log('   npm run dev\n')
@@ -49,6 +63,13 @@ async function testGenerateInitialCase() {
     console.log('   - FRONTEND_URL (opcional, solo si hay frontend)\n')
     process.exit(1)
   }
+
+  // Usar el puerto donde encontramos el servidor
+  const actualPort = serverStatus.port || SERVER_PORT
+  const actualApiUrl = `http://localhost:${actualPort}`
+  const actualEndpoint = `${actualApiUrl}/api/generate-initial-case`
+  
+  console.log(`📍 Endpoint: ${actualEndpoint}\n`)
 
   // Datos de prueba
   const testData = {
@@ -68,7 +89,7 @@ async function testGenerateInitialCase() {
   try {
     const startTime = Date.now()
     
-    const response = await fetch(ENDPOINT, {
+    const response = await fetch(actualEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

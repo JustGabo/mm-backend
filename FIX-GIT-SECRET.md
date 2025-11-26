@@ -49,3 +49,4 @@ git push -u origin main --force
 ## ⚠️ IMPORTANTE: Si ya pusheaste antes
 Si ya intentaste pushear antes y GitHub rechazó, el commit aún está solo en tu repositorio local, así que podemos hacer reset sin problemas.
 
+

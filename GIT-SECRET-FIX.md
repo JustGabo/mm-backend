@@ -71,3 +71,4 @@ Para evitar esto en el futuro:
 - ✅ Revisa `git status` antes de hacer commit
 - ✅ Usa `git diff` para ver qué estás agregando
 
+

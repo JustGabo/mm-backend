@@ -1,98 +1,99 @@
 {
   "caseTitle": "El Misterio en la Mansión",
-  "caseDescription": "Un asesinato ha sacudido la paz de una elegante mansión, donde los secretos de los sospechosos comienzan a salir a la luz.",
+  "caseDescription": "Un asesinato ha ocurrido en una lujosa mansión durante una fiesta privada, y todos son sospechosos.",
   "victim": {
-    "name": "Ricardo Martínez",
+    "name": "Fernando González",
     "age": 50,
-    "role": "Propietario de la mansión",
-    "description": "Ricardo era un hombre carismático, pero también tenía un carácter fuerte que lo hacía temido.",
-    "causeOfDeath": "Golpe en la cabeza con una lámpara rota, causando traumatismo craneal severo.",
-    "timeOfDeath": "Entre las 9:45pm y 10:15pm",
-    "discoveredBy": "El mayordomo James a las 6:30am",
-    "location": "En el salón principal, tirado junto al sofá.",
-    "bodyPosition": "Boca abajo, con una mano extendida hacia la lámpara rota.",
-    "visibleInjuries": "Herida profunda en la cabeza y contusiones en el brazo.",
-    "objectsAtScene": "Lámpara rota a un lado, un vaso de vino derramado y una nota arrugada.",
-    "signsOfStruggle": "Silla volcada, almohadas desordenadas y un cuadro caído."
+    "role": "Empresario",
+    "description": "Un hombre carismático pero autoritario, siempre buscando el control en los negocios.",
+    "causeOfDeath": "Golpes contundentes en la cabeza causados por un palo de golf.",
+    "timeOfDeath": "Entre las 9:45pm y 10:15pm según la temperatura corporal.",
+    "discoveredBy": "Sofía, la sumeller a las 11:00pm.",
+    "location": "En la biblioteca de la mansión, junto a la estantería de libros.",
+    "bodyPosition": "Boca abajo, con el rostro cubierto de sangre y una postura rígida.",
+    "visibleInjuries": "Heridas en la cabeza por impactos, sangre alrededor.",
+    "objectsAtScene": "Un palo de golf ensangrentado a un lado, un libro abierto, copas de vino caídas.",
+    "signsOfStruggle": "Muebles desordenados, una lámpara rota y papeles tirados por el suelo."
   },
   "suspects": [
     {
       "id": "suspect-1",
-      "name": "Sofía López",
+      "name": "Lucía Martínez",
       "age": 32,
       "role": "Sumeller",
-      "description": "Sofía es una mujer apasionada por el vino, pero puede ser muy celosa de sus logros.",
-      "motive": "Ricardo había criticado su trabajo y la había amenazado con despedirla.",
-      "alibi": "Dijo que estaba en la bodega durante el momento del crimen, pero nadie puede confirmarlo.",
-      "timeGap": "Unos 20 minutos donde no hay testigos.",
+      "description": "Apasionada por el vino y la gastronomía, pero algo celosa de la atención que recibe la víctima.",
+      "motive": "Descontento por la falta de reconocimiento en su trabajo y una discusión previa con la víctima.",
+      "alibi": "Afirmó estar en la bodega, pero no hay testigos que lo confirmen.",
+      "timeGap": "No se la vio desde las 9:30pm hasta su descubrimiento.",
       "suspicious": true,
       "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/women/hotel/wine-woman-30-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvd29tZW4vaG90ZWwvd2luZS13b21hbi0zMC15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwMzI4NTU4LCJleHAiOjE3OTE4NjQ1NTh9.jVpOPZGlkXzpdB49QPyU8gaPoD9iFKttEWjtb81pRrs",
       "traits": [
-        "Celosa de su trabajo",
-        "Conocimiento sobre vinos",
-        "Acceso a la bodega"
+        "celosa",
+        "apasionada",
+        "descontenta"
       ],
       "lastSeen": "Última vez vista en la bodega a las 9:30pm.",
       "gender": "female"
     },
     {
       "id": "suspect-2",
-      "name": "Fernando Ruiz",
-      "age": 37,
-      "role": "Empresario",
-      "description": "Fernando es un hombre astuto, que siempre busca aprovechar las oportunidades a su favor.",
-      "motive": "Ricardo le debía una gran suma de dinero y había amenazado con no pagársela.",
-      "alibi": "Afirmó que estaba en una reunión de negocios, pero no hay registros que lo demuestren.",
-      "timeGap": "Casi una hora sin verificación.",
+      "name": "Carlos Ramírez",
+      "age": 31,
+      "role": "Chef",
+      "description": "Creativo y talentoso, pero con un temperamento explosivo en la cocina.",
+      "motive": "Desavenencias sobre el menú de la fiesta, lo que generó una fuerte discusión con Fernando.",
+      "alibi": "Dijo que estaba en la cocina, pero nadie pudo corroborar su coartada.",
+      "timeGap": "No hay testimonios de su presencia desde las 9:00pm.",
       "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/mansion-owner-35-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vbWFuc2lvbi1vd25lci0zNS15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDcyOTM3LCJleHAiOjE3OTIwMDg5Mzd9.geUU1tq5FhOSMvSz5baqOdZruvyHWhtS8B33v7qw9iE",
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/boat/chef-man-45-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL2JvYXQvY2hlZi1tYW4tNDUteWVhcnMtb2xkLmpwZyIsImlhdCI6MTc2MDQxOTE1NywiZXhwIjoxNzkxOTU1MTU3fQ.l9XIclavvdbsSZe39fkvjUVrixEQjmHW7DKRahJAwD0",
       "traits": [
-        "Astuto y manipulador",
-        "Conexiones en el mundo empresarial",
-        "Conocimiento de la mansión"
+        "irritable",
+        "competitivo",
+        "talentoso"
       ],
-      "lastSeen": "Última vez visto alrededor de las 10:00pm en el bar.",
+      "lastSeen": "Última vez visto en la cocina a las 9:15pm.",
       "gender": "male"
     },
     {
       "id": "suspect-3",
-      "name": "Clara Martínez",
-      "age": 46,
-      "role": "Ama de llaves",
-      "description": "Clara es una mujer dedicada, pero resentida por haber sido tratada como una sirvienta.",
-      "motive": "Se sentía menospreciada por Ricardo y había discutido con él recientemente.",
-      "alibi": "Afirmó que estaba limpiando el piso de arriba, pero no la vieron allí.",
-      "timeGap": "20 minutos sin testigos.",
+      "name": "Javier Torres",
+      "age": 44,
+      "role": "Chofer",
+      "description": "Un hombre reservado que conoce todos los secretos de la mansión y sus inquilinos.",
+      "motive": "Rencor por haber sido despedido previamente por la víctima debido a una mala decisión de transporte.",
+      "alibi": "Afirmó que estaba esperando en el coche, pero no hay cámaras que lo verifiquen.",
+      "timeGap": "No se le vio desde las 9:00pm hasta el descubrimiento del cuerpo.",
       "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/women/hotel/room-attendant-woman-45-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvd29tZW4vaG90ZWwvcm9vbS1hdHRlbmRhbnQtd29tYW4tNDUteWVhcnMtb2xkLmpwZyIsImlhdCI6MTc2MDMyODI1NCwiZXhwIjoxNzkxODY0MjU0fQ.8Yg-Wke0kp3PIEqepk0YibQFEypJK702lgn53WCWYzQ",
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/driver-man-40-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vZHJpdmVyLW1hbi00MC15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDcyODM4LCJleHAiOjE3OTIwMDg4Mzh9.WVdTThOXO0i_gj5G7vOxDPDAxW1wCHHMZ33ejB_tviA",
       "traits": [
-        "Resentida por el trato",
-        "Conocedora de la casa",
-        "Acceso a todas las áreas"
+        "discreto",
+        "conocedor",
+        "resentido"
       ],
-      "lastSeen": "Última vez vista en la cocina a las 9:45pm.",
-      "gender": "female"
+      "lastSeen": "Última vez visto en el coche a las 9:00pm.",
+      "gender": "male"
     }
   ],
   "weapon": {
     "id": "weapon-1",
-    "name": "lampara rota",
-    "description": "Una lámpara de cristal que se rompió al caer durante una pelea, con manchas de sangre en su base.",
-    "location": "Junto al cuerpo de la víctima en el salón principal.",
-    "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/weapons/lamp.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ3ZWFwb25zL2xhbXAuanBnIiwiaWF0IjoxNzYwNjU4MTc4LCJleHAiOjE3OTIxOTQxNzh9.5DLk500oRZ3Yg8tczV3H4vznH3y8Lm46zdhIh_dJCFI",
+    "name": "palo de golf",
+    "description": "Un palo de golf de acero, con manchas evidentes de sangre y marcas de impacto.",
+    "location": "Junto al cuerpo de la víctima en la biblioteca.",
+    "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/weapons/golf.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ3ZWFwb25zL2dvbGYuanBnIiwiaWF0IjoxNzYwNjU3Nzc2LCJleHAiOjE3OTIxOTM3NzZ9.5ll5Px_XSN3Kb5neKEZGIWbRatNb5fa7refM7OvhLJk",
     "importance": "high"
   },
   "hiddenContext": {
-    "guiltyId": "suspect-2",
-    "guiltyReason": "Fernando tenía un fuerte motivo económico para asesinar a Ricardo, quien le debía una suma considerable de dinero. Además, su acceso a la mansión y conocimiento del entorno le permitieron llevar a cabo el crimen sin ser visto.",
+    "guiltyId": "suspect-3",
+    "guiltyReason": "Javier tenía acceso a la mansión y al arma, además de un fuerte motivo de rencor hacia la víctima por su despido. Su coartada es débil y no hay testigos que la respalden, lo que genera sospechas sobre su presencia en el momento del crimen.",
     "keyClues": [
-      "La lámpara rota fue un objeto que solo Fernando podría haber utilizado debido a su cercanía con la víctima.",
-      "Su alibi carece de testigos que puedan corroborarlo.",
-      "Conocía la mansión lo suficiente para moverse sin ser detectado."
+      "El palo de golf fue encontrado en la escena y es un deporte que Javier solía practicar.",
+      "Rastro de sangre parcialmente oculto en el maletero del coche de Javier.",
+      "Una conversación previa sobre el despido se escuchó en la cocina."
     ],
     "guiltyTraits": [
-      "Astuto y manipulador",
-      "Conocimiento de la mansión que le permitió el acceso y escape."
+      "conocedor de la mansión",
+      "resentido por el despido",
+      "discreto pero astuto"
     ]
   },
   "config": {
