@@ -312,6 +312,7 @@ ${suspectsInfo}
 3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
 4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
 5. **IMPORTANTE:** Todos deben tener "suspicious": true
+6. **CRÍTICO - MOTIVOS:** El sospechoso suspect-${randomGuiltyIndex} (el culpable) DEBE tener el motivo MÁS FUERTE de todos. Los demás deben tener motivos fuertes pero MENOS FUERTES que el del culpable. El motivo del culpable debe ser tan convincente que, incluso si hay pistas que sugieren otra cosa (como que es alguien del personal), el motivo debe ser lo suficientemente fuerte para que el jugador pueda descartar esas pistas como menos relevantes.
 
 ${weaponInfo}
 
@@ -354,19 +355,23 @@ Incluye el arma con:
 - NO sigas patrones (siempre suspect-1, siempre el último, etc.)
 
 **REGLAS SOBRE EL CULPABLE (suspect-${randomGuiltyIndex}):**
-- Debe tener motivo fuerte y creíble
-- Debe tener conexión lógica con la víctima
+- ⚠️ **CRÍTICO: Debe tener el MOTIVO MÁS FUERTE de TODOS los sospechosos**
+- El motivo del culpable debe ser significativamente más poderoso que el de los demás
+- Debe tener conexión lógica y profunda con la víctima
+- El motivo debe ser tan fuerte que, incluso si hay pistas que sugieren otra cosa (como que es alguien del personal), el motivo del culpable debe ser lo suficientemente convincente para que el jugador pueda descartar esas pistas como falsas o menos relevantes
 - Debe tener acceso al arma o escena del crimen
 - Sus traits deben conectar sutilmente con el método del crimen
 - Las pistas que apunten a él deben ser SUTILES pero DESCUBRIBLES
+- El motivo debe incluir elementos personales, profesionales o emocionales que lo hagan el más convincente
 
 **REGLAS SOBRE LOS OTROS SOSPECHOSOS:**
 - TODOS los demás sospechosos deben TAMBIÉN parecer culpables
-- Dales motivos creíbles y fuertes
+- Dales motivos creíbles y fuertes, PERO MENOS FUERTES que el del culpable
+- El motivo del culpable debe ser OBJETIVAMENTE el más convincente cuando se comparan todos
 - Dales coartadas con huecos sospechosos
 - Haz que sus traits también conecten con el crimen
-- La diferencia está en las PISTAS SUTILES que solo apuntan al culpable real (suspect-${randomGuiltyIndex})
-- El jugador debe poder DEDUCIR quién es el culpable conectando todas las pistas
+- La diferencia está en las PISTAS SUTILES que solo apuntan al culpable real (suspect-${randomGuiltyIndex}) Y EN EL MOTIVO MÁS FUERTE
+- El jugador debe poder DEDUCIR quién es el culpable conectando todas las pistas Y comparando la fuerza de los motivos
 
 **CONTEXTO OCULTO (hiddenContext):**
 En el objeto "hiddenContext" incluye:

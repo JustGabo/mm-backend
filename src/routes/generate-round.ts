@@ -208,19 +208,44 @@ ${h.discoveredEvidence ? `- Evidencia descubierta: ${h.discoveredEvidence.join('
         : '')
     : '';
 
+  // Obtener información del culpable para las instrucciones
+  const guiltySuspect = caseContext.suspects.find((s: any) => s.id === caseContext.guiltyId)
+  const guiltyRole = guiltySuspect?.role || ''
+  const guiltyMotive = guiltySuspect?.motive || ''
+  const isGuiltyStaff = guiltyRole && (
+    guiltyRole.toLowerCase().includes('mayordomo') ||
+    guiltyRole.toLowerCase().includes('cocinero') ||
+    guiltyRole.toLowerCase().includes('limpieza') ||
+    guiltyRole.toLowerCase().includes('personal') ||
+    guiltyRole.toLowerCase().includes('empleado') ||
+    guiltyRole.toLowerCase().includes('asistente') ||
+    guiltyRole.toLowerCase().includes('sirviente') ||
+    guiltyRole.toLowerCase().includes('camarero') ||
+    guiltyRole.toLowerCase().includes('sumiller') ||
+    guiltyRole.toLowerCase().includes('jardinero') ||
+    guiltyRole.toLowerCase().includes('chofer') ||
+    guiltyRole.toLowerCase().includes('seguridad')
+  )
+
   // Información del culpable (SOLO para coherencia, NO para revelar)
   const guiltyInfo = `
 **⚠️ CULPABLE FIJO (INFORMACIÓN CONFIDENCIAL - NO REVELAR):**
 - ID del culpable: ${caseContext.guiltyId}
+- Nombre: ${guiltySuspect?.name || 'N/A'}
+- Rol: ${guiltyRole}
+- Motivo: ${guiltyMotive}
 - Razón: ${caseContext.guiltyReason}
 - Pistas clave: ${caseContext.keyClues.join(', ')}
 
 **REGLAS CRÍTICAS SOBRE EL CULPABLE:**
+- ⚠️ **MOTIVO MÁS FUERTE:** El culpable tiene el motivo MÁS FUERTE de todos los sospechosos
+- ⚠️ **PISTAS SOBRE PERSONAL:** ${isGuiltyStaff ? 'El culpable ES del personal, así que las pistas sobre personal son válidas.' : 'El culpable NO es del personal. Si generas pistas que sugieren que el culpable es alguien del personal, estas deben ser PISTAS FALSAS o MENOS RELEVANTES que el motivo del culpable. El motivo del culpable debe ser tan fuerte que el jugador pueda descartar pistas sobre personal como menos importantes.'}
 - Rondas 1-6: NO dar pistas sobre el culpable. Investiga a TODOS los sospechosos equitativamente.
-- Rondas 7-9: Pistas MUY sutiles, mezcladas con pistas falsas de otros sospechosos.
-- Ronda 10: Pistas más fuertes pero aún requieren deducción del jugador.
+- Rondas 7-9: Pistas MUY sutiles, mezcladas con pistas falsas de otros sospechosos. Si mencionas "personal", debe ser ambiguo y el motivo del culpable debe ser más fuerte.
+- Ronda 10: Pistas más fuertes pero aún requieren deducción del jugador. El motivo del culpable debe destacar como el más convincente.
 - NUNCA hagas obvio quién es el culpable hasta que el jugador haga su acusación final.
 - Las opciones "correctas" deben dar información útil, NO revelar directamente al culpable.
+- ⚠️ **IMPORTANTE:** Si el culpable NO es del personal, las pistas que sugieren "alguien del personal" deben ser menos relevantes que el motivo del culpable. El jugador debe poder pensar "Vale, la pista dice que pudo haber sido alguien del personal, pero el motivo de [culpable] es mucho más fuerte, así que esa pista puede ser falsa o menos importante."
 `
 
   // Definir el tipo de ronda según el número
@@ -418,9 +443,15 @@ ${difficultyGuidance}
 **SOSPECHOSOS:**
 ${caseContext.suspects.map((s: any) => `
 - ${s.name} (ID: ${s.id}): ${s.role}, ${s.age} años
-  Motivo: ${s.motive}
+  Motivo: ${s.motive}${s.id === caseContext.guiltyId ? ' ⚠️ [CULPABLE - MOTIVO MÁS FUERTE]' : ''}
   Traits: ${s.traits?.join(', ') || 'N/A'}
 `).join('\n')}
+
+⚠️ **IMPORTANTE SOBRE MOTIVOS:**
+- El culpable (${guiltySuspect?.name || caseContext.guiltyId}) tiene el motivo MÁS FUERTE de todos
+- Si generas pistas que sugieren que el culpable es del personal pero el culpable NO es del personal, esas pistas deben ser MENOS RELEVANTES que el motivo del culpable
+- El jugador debe poder pensar: "La pista dice que pudo ser alguien del personal, pero el motivo de [culpable] es mucho más fuerte, así que esa pista puede ser falsa o menos importante"
+- El motivo del culpable debe ser tan convincente que opaquen pistas confusas sobre personal
 
 ${guiltyInfo}
 
@@ -494,14 +525,16 @@ ${roundGuidance}
    - Nota: Solo usa nombres si la opción los mencionó explícitamente
    
    **NORMAL:**
-   - "Alguien del personal con [trait] estuvo en esa área durante el periodo crítico."
+   - "Alguien del personal con [trait] estuvo en esa área durante el periodo crítico." ${!isGuiltyStaff ? '(⚠️ Si el culpable NO es del personal, esta pista debe ser menos relevante que el motivo del culpable)' : ''}
    - "Encuentras un objeto que coincide con los rasgos de [descripción vaga]."
    - "Hay inconsistencias en los testimonios del grupo de sospechosos principales."
+   - ⚠️ **IMPORTANTE:** Si el culpable NO es del personal, las pistas sobre "personal" deben ser ambiguas y menos convincentes que el motivo del culpable. El jugador debe poder priorizar el motivo más fuerte sobre las pistas sobre personal.
    
    **DIFÍCIL:**
    - "Los testimonios se contradicen entre sí, sugiriendo que alguien oculta información."
    - "La evidencia apunta a múltiples personas, pero un detalle parece intencionalmente alterado."
    - "Alguien con conocimiento íntimo del lugar manipuló elementos clave de la escena."
+   - ⚠️ **CRÍTICO:** Si el culpable NO es del personal, NO generes pistas fuertes que sugieran que el culpable es del personal. Si mencionas "personal", debe ser ambiguo y el motivo del culpable debe ser claramente más fuerte y convincente.
    
    ❌ MALOS EJEMPLOS:
    - "No encuentras nada relevante" (muy vago)
@@ -571,6 +604,20 @@ ${roundGuidance}
 - El jugador debe DEDUCIR basándose en TODAS las pistas, no en una sola ronda
 - Si un resultado hace que un sospechoso parezca culpable, TAMBIÉN haz que otro parezca culpable
 - Mantén la tensión y el misterio hasta que el jugador haga su acusación final
+
+⚠️ **REGLA CRÍTICA SOBRE PISTAS DE PERSONAL Y MOTIVOS:**
+${!isGuiltyStaff ? `
+- El culpable (${guiltySuspect?.name || caseContext.guiltyId}) NO es del personal (es ${guiltyRole})
+- Si generas pistas que sugieren "alguien del personal", estas deben ser AMBIGUAS y MENOS RELEVANTES
+- El motivo del culpable (${guiltyMotive}) es el MÁS FUERTE de todos
+- Las pistas sobre personal deben ser lo suficientemente débiles/ambiguas para que el jugador pueda pensar: "Vale, la pista dice que pudo haber sido alguien del personal, pero el motivo de ${guiltySuspect?.name || 'el culpable'} es mucho más fuerte, así que esa pista puede ser falsa o menos importante"
+- El motivo del culpable debe ser tan convincente que opaquen pistas confusas sobre personal
+- NO hagas que las pistas sobre personal sean más fuertes que el motivo del culpable a menos que la dificultad sea dificil
+` : `
+- El culpable (${guiltySuspect?.name || caseContext.guiltyId}) ES del personal (es ${guiltyRole})
+- Las pistas sobre personal son válidas y pueden apuntar al culpable
+- El motivo del culpable (${guiltyMotive}) sigue siendo el MÁS FUERTE de todos
+`}
 
 **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
 `
