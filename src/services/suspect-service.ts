@@ -1,4 +1,4 @@
-import { supabase, Suspect, SuspectSelectionOptions, testSupabaseConnection } from '../services/supabase'
+import { supabase, Suspect, SuspectSelectionOptions, testSupabaseConnection } from '../services/supabase.js'
 
 // Mapeo de escenarios del frontend a tags de Supabase
 const SCENARIO_TAG_MAP: Record<string, string> = {

@@ -1,4 +1,4 @@
-import { supabase, Weapon, WeaponSelectionOptions } from '../services/supabase'
+import { supabase, Weapon, WeaponSelectionOptions } from '../services/supabase.js'
 
 const SCENARIO_TAG_MAP: Record<string, string> = {
   'mansion': 'mansion',

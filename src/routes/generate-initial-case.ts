@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
-import { SuspectService } from '../services/suspect-service'
-import { WeaponService } from '../services/weapon-service'
+import { SuspectService } from '../services/suspect-service.js'
+import { WeaponService } from '../services/weapon-service.js'
 import OpenAI from 'openai'
 
 // Lazy initialization - solo crea el cliente cuando se necesite
