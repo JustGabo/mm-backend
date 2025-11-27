@@ -19,14 +19,35 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS Configuration
-const allowedOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : ['http://localhost:3000'];
+// Normalizar URLs: remover barras finales y espacios
+const normalizeUrl = (url: string): string => {
+  return url.trim().replace(/\/+$/, ''); // Remover barras finales
+};
 
-// En producción, agregar el dominio del frontend
+const allowedOrigins: string[] = [];
+
+// Agregar URLs desde FRONTEND_URL
+if (process.env.FRONTEND_URL) {
+  const urls = process.env.FRONTEND_URL.split(',').map(normalizeUrl);
+  allowedOrigins.push(...urls);
+}
+
+// En producción, agregar dominios comunes del frontend
 if (process.env.NODE_ENV === 'production') {
-  allowedOrigins.push('https://misterymaker.com');
-  allowedOrigins.push('https://www.misterymaker.com');
+  const productionUrls = [
+    'https://misterymaker.com',
+    'https://www.misterymaker.com'
+  ];
+  productionUrls.forEach(url => {
+    if (!allowedOrigins.includes(url)) {
+      allowedOrigins.push(url);
+    }
+  });
+}
+
+// Si no hay URLs configuradas, usar localhost por defecto
+if (allowedOrigins.length === 0) {
+  allowedOrigins.push('http://localhost:3000');
 }
 
 const corsOptions = {
@@ -34,11 +55,15 @@ const corsOptions = {
     // Permitir requests sin origin (como Postman, curl, etc.)
     if (!origin) return callback(null, true);
     
-    // Verificar si el origin está permitido
-    if (allowedOrigins.includes(origin)) {
+    // Normalizar el origin recibido (remover barra final)
+    const normalizedOrigin = normalizeUrl(origin);
+    
+    // Verificar si el origin está permitido (comparación exacta o normalizada)
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin)) {
       callback(null, true);
     } else {
       console.warn(`⚠️  CORS blocked origin: ${origin}`);
+      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -47,7 +72,12 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+// Aplicar CORS antes que cualquier otra cosa
 app.use(cors(corsOptions));
+
+// Manejar preflight requests explícitamente
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Health check
