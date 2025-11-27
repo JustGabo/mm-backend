@@ -448,10 +448,11 @@ ${caseContext.suspects.map((s: any) => `
 `).join('\n')}
 
 ⚠️ **IMPORTANTE SOBRE MOTIVOS:**
-- El culpable (${guiltySuspect?.name || caseContext.guiltyId}) tiene el motivo MÁS FUERTE de todos
+- El culpable (${guiltySuspect?.name || caseContext.guiltyId}) tiene el motivo MÁS FUERTE de todos (en términos de contenido/convicción, no de longitud)
+- Todos los motivos tienen longitud similar, pero el del culpable es más convincente por su contenido
 - Si generas pistas que sugieren que el culpable es del personal pero el culpable NO es del personal, esas pistas deben ser MENOS RELEVANTES que el motivo del culpable
 - El jugador debe poder pensar: "La pista dice que pudo ser alguien del personal, pero el motivo de [culpable] es mucho más fuerte, así que esa pista puede ser falsa o menos importante"
-- El motivo del culpable debe ser tan convincente que opaquen pistas confusas sobre personal
+- El motivo del culpable debe ser tan convincente (por su contenido) que opaquen pistas confusas sobre personal
 
 ${guiltyInfo}
 
