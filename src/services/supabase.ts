@@ -96,6 +96,7 @@ export interface SuspectSelectionOptions {
   count: number
   style?: 'realistic' | 'pixel'
   genderPreference?: 'male' | 'female' | 'mixed'
+  preferredGenders?: string[];
   occupationFilter?: string[]
   ageRange?: { min: number; max: number }
 }
