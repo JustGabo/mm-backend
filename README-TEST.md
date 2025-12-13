@@ -5,9 +5,9 @@
 1. **Variables de entorno configuradas** - Crea un archivo `.env` en la raíz del proyecto con:
 
 ```env
-OPENAI_API_KEY=tu_clave_de_openai
-NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_de_supabase
+OPENAI_API_KEY=<your-openai-api-key>
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 PORT=3001
 FRONTEND_URL=http://localhost:3000  # Opcional: solo necesario si hay un frontend
 ```

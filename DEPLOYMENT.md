@@ -16,11 +16,11 @@ Crea un archivo `.env` en tu servidor con:
 
 ```env
 # OpenAI
-OPENAI_API_KEY=tu_clave_de_openai
+OPENAI_API_KEY=<your-openai-api-key>
 
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-project-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 
 # Servidor
 PORT=3001
