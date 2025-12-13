@@ -50,6 +50,17 @@ export class SuspectService {
 
     let result: Suspect[] = []
 
+    // Si hay preferredGenders, obtener sospechosos por género desde el principio
+    if (preferredGenders && preferredGenders.length > 0) {
+      console.log('🎯 Gender-specific selection mode: Getting suspects by gender for each position')
+      return await this.getSuspectsByGenderPreferences({
+        count,
+        sceneTag,
+        style,
+        preferredGenders
+      })
+    }
+
     try {
       // Si hay un escenario específico, obtener sospechosos del escenario + extras
       if (sceneTag && sceneTag !== 'random') {
@@ -305,63 +316,150 @@ export class SuspectService {
       console.log(`⚠️ Removed ${result.length - uniqueResult.length} duplicate suspects`)
     }
 
-    // MATCHING POR GÉNERO: Si hay preferredGenders, reorganizar para hacer matching inteligente
-    let finalResult = uniqueResult
-    if (preferredGenders && preferredGenders.length > 0 && uniqueResult.length >= preferredGenders.length) {
-      console.log('🔀 Applying gender-based matching...')
-      
-      const matched: Suspect[] = []
-      const unmatched: Suspect[] = [...uniqueResult]
-      const usedIndices = new Set<number>()
-      
-      // Para cada género preferido, intentar encontrar un sospechoso que coincida
-      for (let i = 0; i < preferredGenders.length && i < uniqueResult.length; i++) {
-        const preferredGender = preferredGenders[i].toLowerCase()
-        
-        // Buscar un sospechoso que coincida con el género preferido
-        const matchIndex = unmatched.findIndex((suspect, idx) => {
-          if (usedIndices.has(idx)) return false
-          const suspectGender = (suspect.gender || '').toLowerCase()
-          return suspectGender === preferredGender
-        })
-        
-        if (matchIndex !== -1) {
-          matched.push(unmatched[matchIndex])
-          usedIndices.add(matchIndex)
-          console.log(`  ✅ Position ${i + 1}: Matched ${preferredGender} → ${unmatched[matchIndex].gender} (${unmatched[matchIndex].occupation?.es || unmatched[matchIndex].occupation})`)
-        } else {
-          // Si no hay match, usar el siguiente disponible
-          const nextAvailable = unmatched.findIndex((_, idx) => !usedIndices.has(idx))
-          if (nextAvailable !== -1) {
-            matched.push(unmatched[nextAvailable])
-            usedIndices.add(nextAvailable)
-            console.log(`  ⚠️ Position ${i + 1}: No ${preferredGender} match, using ${unmatched[nextAvailable].gender} (${unmatched[nextAvailable].occupation?.es || unmatched[nextAvailable].occupation})`)
-          }
-        }
-      }
-      
-      // Agregar los sospechosos restantes que no se usaron
-      unmatched.forEach((suspect, idx) => {
-        if (!usedIndices.has(idx) && matched.length < uniqueResult.length) {
-          matched.push(suspect)
-        }
-      })
-      
-      finalResult = matched
-      console.log(`✅ Gender matching complete: ${matched.filter((s, i) => i < preferredGenders.length && (s.gender || '').toLowerCase() === preferredGenders[i].toLowerCase()).length}/${preferredGenders.length} positions matched`)
-    }
-
-    console.log(`🎯 FINAL RESULT: Returning ${finalResult.length} unique suspects:`)
-    finalResult.forEach((suspect, index) => {
+    console.log(`🎯 FINAL RESULT: Returning ${uniqueResult.length} unique suspects:`)
+    uniqueResult.forEach((suspect, index) => {
       const tags = suspect.tags?.join(', ') || 'no-tags'
       const isExtra = suspect.tags?.includes('extra') ? '⭐ EXTRA' : ''
-      const genderMatch = preferredGenders && preferredGenders[index] 
-        ? (suspect.gender || '').toLowerCase() === preferredGenders[index].toLowerCase() ? '✅' : '⚠️'
-        : ''
-      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} ${genderMatch} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
+      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
     })
 
-    return finalResult
+    return uniqueResult
+  }
+
+  /**
+   * Obtiene sospechosos filtrando por género específico para cada posición
+   */
+  private static async getSuspectsByGenderPreferences(options: {
+    count: number
+    sceneTag: string | null
+    style?: 'realistic' | 'pixel'
+    preferredGenders: string[]
+  }): Promise<Suspect[]> {
+    const { count, sceneTag, style, preferredGenders } = options
+    const result: Suspect[] = []
+    const usedIds = new Set<string>()
+
+    console.log(`🎯 Getting ${count} suspects with gender-specific filtering`)
+
+    // Para cada posición, obtener un sospechoso del género correcto
+    for (let i = 0; i < count && i < preferredGenders.length; i++) {
+      const requiredGender = preferredGenders[i].toLowerCase()
+      console.log(`  Position ${i + 1}: Looking for ${requiredGender}...`)
+
+      // Construir query base
+      let query = supabase
+        .from('suspects')
+        .select('*')
+        .eq('gender', requiredGender)
+        .limit(20) // Obtener varios para poder elegir
+
+      // Filtrar por escenario si hay uno
+      if (sceneTag && sceneTag !== 'random') {
+        query = query.contains('tags', [sceneTag])
+      } else if (sceneTag === null) {
+        // Modo aleatorio: buscar en todos los escenarios
+        const scenarioTags = ['mansion', 'hotel', 'office', 'boat', 'theater', 'museum']
+        query = query.or(scenarioTags.map(tag => `tags.cs.{${tag}}`).join(','))
+      }
+
+      // Filtrar por estilo si se especifica
+      if (style) {
+        query = query.eq('style', style)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error(`❌ Error fetching ${requiredGender} suspects:`, error)
+        // Continuar con el siguiente género
+        continue
+      }
+
+      // Filtrar los que ya usamos y mezclar
+      const available = (data || [])
+        .filter(s => !usedIds.has(s.id))
+        .sort(() => Math.random() - 0.5)
+
+      if (available.length === 0) {
+        console.warn(`⚠️ No available ${requiredGender} suspects found for position ${i + 1}, trying without scene filter...`)
+        
+        // Intentar sin filtro de escenario
+        let fallbackQuery = supabase
+          .from('suspects')
+          .select('*')
+          .eq('gender', requiredGender)
+          .limit(20)
+
+        if (style) {
+          fallbackQuery = fallbackQuery.eq('style', style)
+        }
+
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery
+
+        if (!fallbackError && fallbackData) {
+          const fallbackAvailable = fallbackData
+            .filter(s => !usedIds.has(s.id))
+            .sort(() => Math.random() - 0.5)
+
+          if (fallbackAvailable.length > 0) {
+            const selected = fallbackAvailable[0]
+            result.push(selected)
+            usedIds.add(selected.id)
+            console.log(`  ✅ Position ${i + 1}: Selected ${selected.gender} (${selected.occupation?.es || selected.occupation})`)
+            continue
+          }
+        }
+
+        console.error(`❌ No ${requiredGender} suspects available at all for position ${i + 1}`)
+        // Si no hay del género requerido, no podemos continuar
+        throw new Error(`No se encontraron suficientes sospechosos del género "${requiredGender}" para la posición ${i + 1}. Por favor, intenta con otro género o escenario.`)
+      }
+
+      const selected = available[0]
+      result.push(selected)
+      usedIds.add(selected.id)
+      console.log(`  ✅ Position ${i + 1}: Selected ${selected.gender} (${selected.occupation?.es || selected.occupation})`)
+    }
+
+    // Si necesitamos más sospechosos que géneros especificados, obtener los restantes sin filtro de género
+    if (result.length < count) {
+      console.log(`📊 Need ${count - result.length} more suspects (no gender specified for these positions)`)
+      
+      let extraQuery = supabase
+        .from('suspects')
+        .select('*')
+        .limit((count - result.length) * 3)
+
+      if (sceneTag && sceneTag !== 'random') {
+        extraQuery = extraQuery.contains('tags', [sceneTag])
+      }
+
+      if (style) {
+        extraQuery = extraQuery.eq('style', style)
+      }
+
+      const { data: extraData, error: extraError } = await extraQuery
+
+      if (!extraError && extraData) {
+        const extraAvailable = extraData
+          .filter(s => !usedIds.has(s.id))
+          .sort(() => Math.random() - 0.5)
+          .slice(0, count - result.length)
+
+        result.push(...extraAvailable)
+        extraAvailable.forEach(s => usedIds.add(s.id))
+        console.log(`✅ Added ${extraAvailable.length} additional suspects`)
+      }
+    }
+
+    console.log(`🎯 FINAL RESULT (Gender-filtered): ${result.length} suspects`)
+    result.forEach((suspect, index) => {
+      const expectedGender = preferredGenders[index] || 'any'
+      const match = suspect.gender?.toLowerCase() === expectedGender.toLowerCase() ? '✅' : '⚠️'
+      console.log(`  ${index + 1}. ${suspect.gender || 'NO_GENDER'} ${match} (expected: ${expectedGender}) - ${suspect.occupation?.es || suspect.occupation}`)
+    })
+
+    return result
   }
 
   /**
