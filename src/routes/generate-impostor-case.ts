@@ -107,7 +107,27 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const { language = 'es', playerNames = [], playerGenders = [] } = body;
+    const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body;
+
+    // Normalizar playerNames: puede venir como array de strings o array de objetos { name, gender }
+    const playerNames: string[] = rawPlayerNames.map((item: any) => {
+      if (typeof item === 'string') {
+        return item;
+      } else if (item && typeof item === 'object' && item.name) {
+        return item.name;
+      }
+      return String(item || '');
+    });
+
+    // Normalizar playerGenders: puede venir como array de strings o extraerse de los objetos
+    const playerGenders: string[] = rawPlayerGenders.length > 0 
+      ? rawPlayerGenders.map((item: any) => typeof item === 'string' ? item : String(item || ''))
+      : rawPlayerNames.map((item: any) => {
+          if (item && typeof item === 'object' && item.gender) {
+            return item.gender;
+          }
+          return '';
+        }).filter(g => g);
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`);
@@ -194,6 +214,29 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
         .replace(/```\s*$/g, '')
         .trim();
       parsedCase = JSON.parse(cleanedResponse);
+    }
+    
+    // PRIMERO: Si hay nombres proporcionados, sobrescribirlos ANTES de hacer el matching
+    if (parsedCase.players && playerNames && playerNames.length > 0) {
+      console.log('🔧 Applying provided player names to players...');
+      parsedCase.players = parsedCase.players.map((player: any, index: number) => {
+        // Asegurar que name sea un string válido
+        let name: string = player.name;
+        if (typeof name === 'object' && name !== null) {
+          name = (name as any).toString() || String(name);
+          console.warn(`⚠️ Player ${index + 1} name was an object, converted to: "${name}"`);
+        } else if (typeof name !== 'string') {
+          name = String(name || '');
+        }
+        
+        // Si hay un nombre proporcionado para este índice, usarlo
+        if (playerNames[index]) {
+          name = playerNames[index];
+          console.log(`✅ Applied provided name for player-${index + 1}: "${name}"`);
+        }
+        
+        return { ...player, name: name };
+      });
     }
     
     // Asignar URLs reales de Supabase a los jugadores
