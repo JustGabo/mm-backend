@@ -36,9 +36,9 @@ cp .env.example .env
 
 2. Configura las variables de entorno en `.env`:
 ```env
-OPENAI_API_KEY=tu_clave
-NEXT_PUBLIC_SUPABASE_URL=tu_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave
+OPENAI_API_KEY=<your-openai-api-key>
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 PORT=3001
 FRONTEND_URL=https://misterymaker.com
 ```
@@ -84,9 +84,9 @@ docker build -t mystery-maker-backend .
 
 ```bash
 docker run -p 3001:3001 \
-  -e OPENAI_API_KEY=tu_clave \
-  -e NEXT_PUBLIC_SUPABASE_URL=tu_url \
-  -e NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave \
+  -e OPENAI_API_KEY=<your-openai-api-key> \
+  -e NEXT_PUBLIC_SUPABASE_URL=<your-supabase-url> \
+  -e NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key> \
   -e FRONTEND_URL=https://misterymaker.com \
   mystery-maker-backend
 ```

@@ -17,9 +17,9 @@ npm start
 Configura estas variables en el dashboard de Render:
 
 ```
-OPENAI_API_KEY=tu_clave_de_openai
-NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima
+OPENAI_API_KEY=<your-openai-api-key>
+NEXT_PUBLIC_SUPABASE_URL=<your-supabase-project-url>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 PORT=3001
 NODE_ENV=production
 FRONTEND_URL=https://misterymaker.com,https://www.misterymaker.com
