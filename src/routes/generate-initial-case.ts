@@ -108,7 +108,28 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       )
     }
 
-    const { language = 'es', playerNames = [], playerGenders = [] } = body
+    const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body
+
+    // Normalizar playerNames: puede venir como array de strings o array de objetos { name, gender }
+    const playerNames: string[] = rawPlayerNames.map((item: any) => {
+      if (typeof item === 'string') {
+        return item
+      } else if (item && typeof item === 'object' && item.name) {
+        return item.name
+      }
+      return String(item || '')
+    })
+
+    // Normalizar playerGenders: puede venir como array de strings o extraerse de los objetos
+    const playerGenders: string[] = rawPlayerGenders.length > 0 
+      ? rawPlayerGenders.map((item: any) => typeof item === 'string' ? item : String(item || ''))
+      : rawPlayerNames.map((item: any) => {
+          if (item && typeof item === 'object' && item.gender) {
+            return item.gender
+          }
+          return ''
+        }).filter(g => g)
+
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
