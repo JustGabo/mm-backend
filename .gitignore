@@ -1,6 +1,7 @@
 # Variables de entorno
 .env
 .env.local
+.env.*.local
 
 # Dependencies
 node_modules/
@@ -12,6 +13,11 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Test response files
+test-response.json
+test-impostor-response.json
+test-impostor-discussion-response.json
 
 # OS
 .DS_Store
