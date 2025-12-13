@@ -421,7 +421,7 @@ Crea una víctima con TODOS estos campos (NO OMITIR NINGUNO):
 - Descripción BREVE de su personalidad (1-2 oraciones máximo)
 ${caseType === 'asesinato' ? `- **causeOfDeath**: Causa de muerte específica y detallada (relacionada con el arma: ${language === 'es' ? selectedWeapon?.name.es : selectedWeapon?.name.en || 'arma genérica'})` : ''}
 - **timeOfDeath**: Hora de muerte estimada (ej: "Entre las 9:45pm y 10:15pm según la temperatura corporal")
-- **discoveredBy**: Quién encontró el cuerpo CON LA HORA (ej: "Sofía, la sumeller a las 11:00pm" o "El mayordomo James a las 6:30am")
+- **discoveredBy**: Quién encontró el cuerpo CON LA HORA (ej: "Sofía, la sumeller a las 11:00pm" o "El mayordomo James a las 6:30am, esto puede variar, cualquier persona pudo haber encontrado a la victima, esto es solo un ejemplo")
 - **location**: Ubicación exacta y detallada (ej: "En su oficina privada del segundo piso, tirado junto al escritorio")
 - **bodyPosition**: Descripción detallada de la posición del cuerpo (ej: "Boca arriba, brazos extendidos, señales de lucha")
 - **visibleInjuries**: Heridas visibles específicas (ej: "Tres heridas de arma blanca en el pecho, sangre seca alrededor")
