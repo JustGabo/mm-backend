@@ -133,10 +133,12 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
+    console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`)
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: body.scenario,
       style: body.style,
+      preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     })
     
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)

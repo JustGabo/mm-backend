@@ -26,9 +26,12 @@ export class SuspectService {
    * Obtiene sospechosos inteligentemente: del escenario + extras
    */
   static async getSuspectsForScene(options: SuspectSelectionOptions): Promise<Suspect[]> {
-    const { count, scene, style } = options
+    const { count, scene, style, preferredGenders } = options
 
     console.log('🔍 SUSPECT SERVICE: Getting', count, 'suspects for scene:', scene || 'random', 'with style:', style || 'any')
+    if (preferredGenders && preferredGenders.length > 0) {
+      console.log(`👥 Gender preferences: ${preferredGenders.join(', ')}`)
+    }
 
     // Probar la conexión primero
     const connectionTest = await testSupabaseConnection()
@@ -302,14 +305,63 @@ export class SuspectService {
       console.log(`⚠️ Removed ${result.length - uniqueResult.length} duplicate suspects`)
     }
 
-    console.log(`🎯 FINAL RESULT: Returning ${uniqueResult.length} unique suspects:`)
-    uniqueResult.forEach((suspect, index) => {
+    // MATCHING POR GÉNERO: Si hay preferredGenders, reorganizar para hacer matching inteligente
+    let finalResult = uniqueResult
+    if (preferredGenders && preferredGenders.length > 0 && uniqueResult.length >= preferredGenders.length) {
+      console.log('🔀 Applying gender-based matching...')
+      
+      const matched: Suspect[] = []
+      const unmatched: Suspect[] = [...uniqueResult]
+      const usedIndices = new Set<number>()
+      
+      // Para cada género preferido, intentar encontrar un sospechoso que coincida
+      for (let i = 0; i < preferredGenders.length && i < uniqueResult.length; i++) {
+        const preferredGender = preferredGenders[i].toLowerCase()
+        
+        // Buscar un sospechoso que coincida con el género preferido
+        const matchIndex = unmatched.findIndex((suspect, idx) => {
+          if (usedIndices.has(idx)) return false
+          const suspectGender = (suspect.gender || '').toLowerCase()
+          return suspectGender === preferredGender
+        })
+        
+        if (matchIndex !== -1) {
+          matched.push(unmatched[matchIndex])
+          usedIndices.add(matchIndex)
+          console.log(`  ✅ Position ${i + 1}: Matched ${preferredGender} → ${unmatched[matchIndex].gender} (${unmatched[matchIndex].occupation?.es || unmatched[matchIndex].occupation})`)
+        } else {
+          // Si no hay match, usar el siguiente disponible
+          const nextAvailable = unmatched.findIndex((_, idx) => !usedIndices.has(idx))
+          if (nextAvailable !== -1) {
+            matched.push(unmatched[nextAvailable])
+            usedIndices.add(nextAvailable)
+            console.log(`  ⚠️ Position ${i + 1}: No ${preferredGender} match, using ${unmatched[nextAvailable].gender} (${unmatched[nextAvailable].occupation?.es || unmatched[nextAvailable].occupation})`)
+          }
+        }
+      }
+      
+      // Agregar los sospechosos restantes que no se usaron
+      unmatched.forEach((suspect, idx) => {
+        if (!usedIndices.has(idx) && matched.length < uniqueResult.length) {
+          matched.push(suspect)
+        }
+      })
+      
+      finalResult = matched
+      console.log(`✅ Gender matching complete: ${matched.filter((s, i) => i < preferredGenders.length && (s.gender || '').toLowerCase() === preferredGenders[i].toLowerCase()).length}/${preferredGenders.length} positions matched`)
+    }
+
+    console.log(`🎯 FINAL RESULT: Returning ${finalResult.length} unique suspects:`)
+    finalResult.forEach((suspect, index) => {
       const tags = suspect.tags?.join(', ') || 'no-tags'
       const isExtra = suspect.tags?.includes('extra') ? '⭐ EXTRA' : ''
-      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
+      const genderMatch = preferredGenders && preferredGenders[index] 
+        ? (suspect.gender || '').toLowerCase() === preferredGenders[index].toLowerCase() ? '✅' : '⚠️'
+        : ''
+      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} ${genderMatch} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
     })
 
-    return uniqueResult
+    return finalResult
   }
 
   /**

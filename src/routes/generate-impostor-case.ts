@@ -131,7 +131,9 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`);
-    console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`);
+    if (playerGenders.length > 0) {
+      console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`);
+    }
     
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
