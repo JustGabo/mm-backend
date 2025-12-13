@@ -33,8 +33,6 @@ export interface InitialCaseGenerationRequest {
   difficulty: string
   style?: 'realistic' | 'pixel'
   language?: string
-  playerNames?: string[]
-  playerGenders?: string[]
 }
 
 export interface InitialCaseResponse {
@@ -108,16 +106,14 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       )
     }
 
-    const { language = 'es', playerNames = [], playerGenders = [] } = body
+    const { language = 'es' } = body
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
-    
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: body.scenario,
       style: body.style,
-      preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     })
     
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
@@ -139,7 +135,7 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     console.log(`🎲 Random guilty suggestion: suspect-${randomGuiltyIndex}`)
 
     // Crear prompt para OpenAI
-    const prompt = createInitialCasePrompt(body, selectedSuspects, selectedWeapon, language, randomGuiltyIndex, playerNames, playerGenders)
+    const prompt = createInitialCasePrompt(body, selectedSuspects, selectedWeapon, language, randomGuiltyIndex)
 
     console.log('🤖 Calling OpenAI for initial case generation...')
     
@@ -278,9 +274,7 @@ function createInitialCasePrompt(
   selectedSuspects: any[],
   selectedWeapon: any,
   language: string,
-  randomGuiltyIndex: number,
-  playerNames: string[],
-  playerGenders: string[]
+  randomGuiltyIndex: number
 ): string {
   const { caseType, suspects, clues, scenario, difficulty } = request
 
@@ -291,25 +285,6 @@ function createInitialCasePrompt(
 - Tags: ${s.tags?.join(', ') || 'sin tags'}
 - URL de imagen: ${s.image_url}
 `).join('\n')
-
-  const namesInfo = playerNames.length > 0 
-    ? `\n**🚨 NOMBRES OBLIGATORIOS - DEBES USAR ESTOS NOMBRES EXACTOS:**\n${playerNames.map((name, i) => {
-        const gender = playerGenders[i] || 'unknown'
-        return `- suspect-${i + 1} DEBE llamarse "${name}" (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
-      }).join('\n')}\n\n⚠️ **CRÍTICO - LEE CON ATENCIÓN:**
-- El sospechoso con id "suspect-1" DEBE tener el nombre "${playerNames[0] || 'NOMBRE_GENERADO'}"
-${playerNames[1] ? `- El sospechoso con id "suspect-2" DEBE tener el nombre "${playerNames[1]}"` : ''}
-${playerNames[2] ? `- El sospechoso con id "suspect-3" DEBE tener el nombre "${playerNames[2]}"` : ''}
-${playerNames[3] ? `- El sospechoso con id "suspect-4" DEBE tener el nombre "${playerNames[3]}"` : ''}
-- NO inventes nombres diferentes. NO uses variaciones. Usa EXACTAMENTE los nombres proporcionados.
-- Si hay más sospechosos que nombres proporcionados, genera nombres apropiados SOLO para los sospechosos que no tienen nombre asignado (suspect-${playerNames.length + 1}, suspect-${playerNames.length + 2}, etc.).\n`
-    : '\n**NOMBRES:** Genera nombres apropiados para todos los sospechosos basándote en el género y ocupación de cada uno.\n'
-  
-  const gendersInfo = playerGenders.length > 0
-    ? `\n**🚨 GÉNEROS OBLIGATORIOS - DEBES USAR ESTOS GÉNEROS EXACTOS:**\n${playerGenders.map((gender, i) => `- suspect-${i + 1} DEBE tener gender "${gender}"`).join('\n')}\n\n⚠️ **CRÍTICO:**
-- Usa estos géneros EXACTOS para los sospechosos en el orden proporcionado.
-- Si hay más sospechosos que géneros proporcionados, asigna géneros apropiados basándote en la ocupación y otros factores SOLO para los sospechosos sin género asignado.\n`
-    : '\n**GÉNEROS:** Asigna géneros apropiados a todos los sospechosos basándote en la ocupación y otros factores.\n'
 
   const weaponInfo = selectedWeapon ? `
 **ARMA HOMICIDA:**
@@ -330,18 +305,10 @@ Genera la introducción de un caso de misterio con la siguiente configuración:
 
 **SOSPECHOSOS DE SUPABASE:**
 ${suspectsInfo}
-${namesInfo}
-${gendersInfo}
 
 **REGLAS PARA SOSPECHOSOS:**
 1. Usa EXACTAMENTE los géneros, edades y ocupaciones proporcionados
-2. ${playerNames.length > 0 ? `🚨 **NOMBRES OBLIGATORIOS - DEBES USAR EXACTAMENTE ESTOS NOMBRES:**
-   - suspect-1 → nombre: "${playerNames[0]}"
-   ${playerNames[1] ? `   - suspect-2 → nombre: "${playerNames[1]}"` : ''}
-   ${playerNames[2] ? `   - suspect-3 → nombre: "${playerNames[2]}"` : ''}
-   ${playerNames[3] ? `   - suspect-4 → nombre: "${playerNames[3]}"` : ''}
-   - NO inventes nombres. NO uses variaciones. NO cambies estos nombres.
-   - Si hay más sospechosos que nombres, genera nombres apropiados SOLO para los sospechosos sin nombre asignado.` : 'Genera nombres que coincidan con el género'}
+2. Genera nombres que coincidan con el género
 3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
 4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
 5. **IMPORTANTE:** Todos deben tener "suspicious": true
