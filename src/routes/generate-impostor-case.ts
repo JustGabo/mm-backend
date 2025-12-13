@@ -3,10 +3,27 @@ import { SuspectService } from '../services/suspect-service.js';
 import { WeaponService } from '../services/weapon-service.js';
 import OpenAI from 'openai';
 
+// Lazy initialization - solo crea el cliente cuando se necesite
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (openaiClient) {
+    return openaiClient;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not defined');
+  }
+
+  openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+  
+  return openaiClient;
+}
+
 const router = Router();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 export interface ImpostorCaseGenerationRequest {
   caseType: string;
@@ -142,6 +159,7 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
 
     console.log('🤖 Calling OpenAI for impostor case generation...');
     
+    const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [

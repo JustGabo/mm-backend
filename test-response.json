@@ -1,117 +1,98 @@
 {
-  "caseTitle": "Asesinato en la Mansión",
-  "caseDescription": "Un misterioso asesinato ha tenido lugar en una mansión antigua, y todos los presentes son sospechosos.",
+  "caseTitle": "El Misterio del Asesinato en la Mansión",
+  "caseDescription": "Un empresario ha sido encontrado muerto en su mansión. Tres sospechosos emergen, cada uno con motivos y coartadas que parecen sospechosas.",
   "victim": {
-    "name": "Ricardo",
-    "age": 50,
-    "role": "Propietario de la mansión",
-    "description": "Ricardo era un hombre carismático, conocido por su generosidad, pero también por su temperamento explosivo.",
+    "name": "Fernando Ruiz",
+    "age": 45,
+    "role": "Empresario",
+    "description": "Era un hombre carismático pero con muchos enemigos por su carácter autoritario.",
     "causeOfDeath": "Golpes contundentes en la cabeza causados por un palo de golf.",
-    "timeOfDeath": "Entre las 9:15pm y 9:45pm según la temperatura corporal.",
-    "discoveredBy": "Gabriel, el analista, a las 10:00pm.",
+    "timeOfDeath": "Entre las 9:45pm y 10:15pm.",
+    "discoveredBy": "Sofía, la sumeller a las 11:00pm.",
     "location": "En el salón principal, tirado junto a la chimenea.",
-    "bodyPosition": "Boca abajo, con los brazos extendidos y una herida profunda en la cabeza.",
-    "visibleInjuries": "Una herida evidente en la cabeza, con hematomas alrededor.",
-    "objectsAtScene": "Un palo de golf ensangrentado a un lado, una copa rota y una silla caída.",
-    "signsOfStruggle": "Cojines desordenados, una lámpara caída y papeles esparcidos por el suelo."
+    "bodyPosition": "Boca abajo, con el rostro ensangrentado hacia el suelo.",
+    "visibleInjuries": "Una gran herida en la parte posterior de la cabeza, sangre fresca.",
+    "objectsAtScene": "Un palo de golf ensangrentado a un lado, una copa rota y un retrato caído.",
+    "signsOfStruggle": "Silla caída, una lámpara rota y papeles desordenados en el suelo."
   },
   "suspects": [
     {
       "id": "suspect-1",
       "name": "Luna",
       "age": 35,
-      "role": "Mayordomo",
-      "description": "Luna es una persona reservada y astuta, conocida por su lealtad, aunque a veces se siente subestimada.",
-      "motive": "Luna estaba resentida por los constantes desprecios de Ricardo hacia su trabajo, lo que la impulsó a actuar por venganza.",
-      "alibi": "Dijo que estaba organizando la despensa durante el tiempo del asesinato, pero no hay pruebas que lo confirmen.",
-      "timeGap": "Nadie la vio entre las 9:15pm y 9:45pm.",
+      "role": "Jardinera",
+      "description": "Es una mujer apasionada por la naturaleza, pero con un carácter fuerte y a veces posesivo.",
+      "motive": "Luna tenía una relación secreta con Fernando, pero él quería terminarla, lo que la llevó a un estado de desesperación.",
+      "alibi": "Dijo que estaba en el jardín, pero nadie la vio en el momento del crimen.",
+      "timeGap": "Entre las 9:30pm y 10:00pm no hay testigos que confirmen su ubicación.",
       "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/butler-man-40-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vYnV0bGVyLW1hbi00MC15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDcxODQxLCJleHAiOjE3OTIwMDc4NDF9.ifWXyYcupjJaSBKX_GCHsJLEn_mqg-nj9Hy8HMt9Dtk",
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/women/mansion/botanic-gardener-woman-35-years-olld.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvd29tZW4vbWFuc2lvbi9ib3RhbmljLWdhcmRlbmVyLXdvbWFuLTM1LXllYXJzLW9sbGQuanBnIiwiaWF0IjoxNzYwNDczMjAyLCJleHAiOjE3OTIwMDkyMDJ9.Mj9wRzCQF7Sm1iGAxRPS3n27Aut37SpH6PQxAFbt2U8",
       "traits": [
-        "lealtad",
-        "resentimiento",
-        "inteligente"
+        "muy emocional",
+        "gran conocimiento de la mansión",
+        "relación con la víctima"
       ],
-      "lastSeen": "Última vez vista en la cocina a las 9:00pm.",
+      "lastSeen": "Última vez vista en el jardín a las 9:15pm.",
       "gender": "female"
     },
     {
       "id": "suspect-2",
-      "name": "Gabriel",
-      "age": 34,
-      "role": "Analista",
-      "description": "Gabriel es un hombre calculador y ambicioso, siempre buscando avanzar en su carrera.",
-      "motive": "Gabriel tenía celos de la relación de Ricardo con sus colegas, sintiendo que se interponía en su camino profesional.",
-      "alibi": "Afirmó que estaba en su oficina revisando informes, pero nadie puede confirmarlo.",
-      "timeGap": "No hay testigos que lo vean entre las 9:15pm y 9:45pm.",
+      "name": "Carlos",
+      "age": 44,
+      "role": "Chofer",
+      "description": "Un hombre serio y reservado, que siempre parece estar enojado.",
+      "motive": "Carlos había sido despedido por Fernando recientemente, lo que le generó resentimiento y deseo de venganza.",
+      "alibi": "Asegura que estaba en su coche, pero no hay pruebas que lo respalden.",
+      "timeGap": "No hay testigos que confirmen su coartada entre las 9:30pm y 10:15pm.",
       "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/office/analyst-man-35-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL29mZmljZS9hbmFseXN0LW1hbi0zNS15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDE3ODcwLCJleHAiOjE3OTE5NTM4NzB9.FlhlmXYuFGTyWem1D0TdXcf3mai8IxD66nD491_Ncb0",
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/driver-man-40-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vZHJpdmVyLW1hbi00MC15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDcyODM4LCJleHAiOjE3OTIwMDg4Mzh9.WVdTThOXO0i_gj5G7vOxDPDAxW1wCHHMZ33ejB_tviA",
       "traits": [
-        "ambición",
-        "celos",
-        "calculador"
+        "frustrado por el despido",
+        "conoce bien los horarios de la mansión",
+        "misterioso"
       ],
-      "lastSeen": "Última vez visto en su oficina a las 9:10pm.",
+      "lastSeen": "Última vez visto en la entrada de la mansión a las 9:40pm.",
       "gender": "male"
     },
     {
       "id": "suspect-3",
-      "name": "Alan",
-      "age": 35,
-      "role": "Chef",
-      "description": "Alan es un apasionado de la cocina, pero su temperamento a veces le juega malas pasadas.",
-      "motive": "Alan estaba frustrado por las críticas de Ricardo a su cocina, lo que podría haberlo llevado a un arrebato.",
-      "alibi": "Declaró que estaba en la cocina preparando la cena, pero no hay testigos que lo corroboren.",
-      "timeGap": "No se le vio entre las 9:15pm y 9:45pm.",
+      "name": "Miguel",
+      "age": 37,
+      "role": "Empresario",
+      "description": "Un competidor de Fernando, ambicioso y conspirador.",
+      "motive": "Miguel quería que Fernando fuera eliminado para poder tomar el control de su empresa.",
+      "alibi": "Dijo que estaba en una reunión, pero no pudo presentar pruebas.",
+      "timeGap": "No hay testigos que avalen su coartada entre las 9:30pm y 10:15pm.",
       "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/chef-man-35-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vY2hlZi1tYW4tMzUteWVhcnMtb2xkLmpwZyIsImlhdCI6MTc2MDQ3Mjc4MSwiZXhwIjoxNzkyMDA4NzgxfQ.ooiFATvGak8JbBI7wzcDp2_hHqKKwxH1TKRBk-47N0g",
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/mansion/mansion-owner-35-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL21hbnNpb24vbWFuc2lvbi1vd25lci0zNS15ZWFycy1vbGQuanBnIiwiaWF0IjoxNzYwNDcyOTM3LCJleHAiOjE3OTIwMDg5Mzd9.geUU1tq5FhOSMvSz5baqOdZruvyHWhtS8B33v7qw9iE",
       "traits": [
-        "pasión",
-        "frustración",
-        "temperamental"
+        "ambicioso",
+        "esquivo",
+        "competitivo"
       ],
-      "lastSeen": "Última vez visto en la cocina a las 9:05pm.",
+      "lastSeen": "Última vez visto en una reunión a las 9:00pm.",
       "gender": "male"
-    },
-    {
-      "id": "suspect-4",
-      "name": "Leslie",
-      "age": 31,
-      "role": "Chef",
-      "description": "Leslie es una persona creativa y amable, pero también con un carácter fuerte.",
-      "motive": "Leslie sentía que Ricardo menospreciaba su trabajo, lo que pudo haberla llevado a actuar impulsivamente.",
-      "alibi": "Aseguró que estaba en su habitación, pero no hay nadie que lo verifique.",
-      "timeGap": "Nadie la vio entre las 9:15pm y 9:45pm.",
-      "suspicious": true,
-      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/boat/chef-man-45-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL2JvYXQvY2hlZi1tYW4tNDUteWVhcnMtb2xkLmpwZyIsImlhdCI6MTc2MDQxOTE1NywiZXhwIjoxNzkxOTU1MTU3fQ.l9XIclavvdbsSZe39fkvjUVrixEQjmHW7DKRahJAwD0",
-      "traits": [
-        "creativa",
-        "amable",
-        "fuerte"
-      ],
-      "lastSeen": "Última vez vista en el jardín a las 9:20pm.",
-      "gender": "female"
     }
   ],
   "weapon": {
     "id": "weapon-1",
     "name": "palo de golf",
-    "description": "Un palo de golf de madera, con manchas de sangre en la parte superior y un ligero abollón en un extremo.",
-    "location": "Encontrado cerca del cuerpo de la víctima en el salón.",
+    "description": "Un palo de golf de marca, con manchas de sangre y una gran fuerza de impacto.",
+    "location": "Encontrado junto al cuerpo de la víctima en el salón.",
     "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/weapons/golf.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ3ZWFwb25zL2dvbGYuanBnIiwiaWF0IjoxNzYwNjU3Nzc2LCJleHAiOjE3OTIxOTM3NzZ9.5ll5Px_XSN3Kb5neKEZGIWbRatNb5fa7refM7OvhLJk",
     "importance": "high"
   },
   "hiddenContext": {
     "guiltyId": "suspect-1",
-    "guiltyReason": "Luna tenía acceso al arma y a la escena del crimen, además de un fuerte resentimiento hacia Ricardo por sus constantes desprecios. Su carácter astuto le permitió planear el ataque sin ser vista.",
+    "guiltyReason": "Luna tenía una relación secreta con Fernando, lo que la llevó a un estado de desesperación tras su intento de terminar la relación. Su acceso al arma y la escena del crimen la convierten en la principal sospechosa.",
     "keyClues": [
-      "Luna fue la última persona vista en la mansión antes del asesinato.",
-      "Se encontró un cabello que coincide con el de Luna cerca del arma homicida.",
-      "La escena del crimen mostraba un signo de lucha que sugiere que la víctima pudo haber intentado defenderse."
+      "El palo de golf utilizado estaba en el jardín antes del asesinato, donde Luna trabaja.",
+      "Luna fue vista discutiendo con Fernando el día anterior.",
+      "La falta de testigos que la confirmen en el jardín durante el crimen es sospechosa."
     ],
     "guiltyTraits": [
-      "su lealtad a veces se confunde con resentimiento",
-      "su conocimiento de la mansión le permitió moverse sin ser notada"
+      "Conocimiento íntimo de la mansión",
+      "Emocionalmente involucrada con la víctima"
     ]
   },
   "config": {

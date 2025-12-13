@@ -1,10 +1,10 @@
 /**
- * Script de prueba para verificar que el endpoint de generar caso inicial funciona
+ * Script de prueba para verificar que el endpoint de generar caso impostor funciona
  * 
  * Uso:
- *   npm run test:case
+ *   npm run test:impostor-case
  *   o
- *   npx tsx test-generate-case.ts
+ *   npx tsx test-generate-impostor-case.ts
  */
 
 import dotenv from 'dotenv'
@@ -16,7 +16,7 @@ dotenv.config() // .env tiene prioridad sobre .env.local
 // Usar el mismo puerto que el servidor
 const SERVER_PORT = process.env.PORT || 3001
 const API_URL = process.env.API_URL || `http://localhost:${SERVER_PORT}`
-const ENDPOINT = `${API_URL}/api/generate-initial-case`
+const ENDPOINT = `${API_URL}/api/generate-impostor-case`
 
 async function checkServerHealth() {
   // Intentar primero con el puerto configurado, luego 3000, luego 3001
@@ -44,8 +44,8 @@ async function checkServerHealth() {
   return { running: false, port: null }
 }
 
-async function testGenerateInitialCase() {
-  console.log('🧪 Iniciando test de generación de caso inicial...\n')
+async function testGenerateImpostorCase() {
+  console.log('🧪 Iniciando test de generación de caso impostor...\n')
 
   // Verificar que el servidor esté corriendo
   console.log('🔍 Verificando que el servidor esté corriendo...')
@@ -67,34 +67,22 @@ async function testGenerateInitialCase() {
   // Usar el puerto donde encontramos el servidor
   const actualPort = serverStatus.port || SERVER_PORT
   const actualApiUrl = `http://localhost:${actualPort}`
-  const actualEndpoint = `${actualApiUrl}/api/generate-initial-case`
+  const actualEndpoint = `${actualApiUrl}/api/generate-impostor-case`
   
   console.log(`📍 Endpoint: ${actualEndpoint}\n`)
 
   // Datos de prueba
   const testData = {
     caseType: 'asesinato',
-    suspects: 3,
+    suspects: 4,
     clues: 8,
     scenario: 'mansion',
     difficulty: 'normal',
     style: 'realistic' as const,
     language: 'es',
-    playerNames: ['Luna'],
-    playerGenders: ['female']
+    playerNames: [],
+    playerGenders: []
   }
-
-  // Nota: Puedes probar sin nombres personalizados comentando las líneas anteriores
-  // y usando esto en su lugar:
-  // const testData = {
-  //   caseType: 'asesinato',
-  //   suspects: 4,
-  //   clues: 8,
-  //   scenario: 'mansion',
-  //   difficulty: 'normal',
-  //   style: 'realistic' as const,
-  //   language: 'es'
-  // }
 
   console.log('📤 Enviando petición con los siguientes datos:')
   console.log(JSON.stringify(testData, null, 2))
@@ -127,22 +115,22 @@ async function testGenerateInitialCase() {
     const data = await response.json()
 
     console.log('✅ Respuesta exitosa!\n')
-    console.log('📋 Resumen del caso generado:')
+    console.log('📋 Resumen del caso impostor generado:')
     console.log(`   Título: ${data.caseTitle}`)
     console.log(`   Tipo: ${data.config.caseType}`)
     console.log(`   Escenario: ${data.config.scenario}`)
     console.log(`   Dificultad: ${data.config.difficulty}`)
     console.log(`   Víctima: ${data.victim.name} (${data.victim.role})`)
-    console.log(`   Sospechosos: ${data.suspects.length}`)
+    console.log(`   Jugadores: ${data.players.length}`)
     console.log(`   Arma: ${data.weapon?.name || 'N/A'}`)
-    console.log(`   Culpable (oculto): ${data.hiddenContext.guiltyId}\n`)
+    console.log(`   Asesino (oculto): ${data.hiddenContext.killerId}\n`)
 
-    console.log('👥 Sospechosos:')
-    data.suspects.forEach((suspect: any, index: number) => {
-      const isGuilty = suspect.id === data.hiddenContext.guiltyId
+    console.log('👥 Jugadores:')
+    data.players.forEach((player: any, index: number) => {
+      const isKiller = player.isKiller === true
       const expectedName = testData.playerNames?.[index] ? ` [Esperado: ${testData.playerNames[index]}]` : ''
-      const nameMatch = testData.playerNames?.[index] === suspect.name ? '✅' : '❌'
-      console.log(`   ${index + 1}. ${suspect.name}${expectedName} ${nameMatch} (${suspect.role}, ${suspect.age} años, ${suspect.gender}) ${isGuilty ? '🔴 [CULPABLE]' : ''}`)
+      const nameMatch = testData.playerNames?.[index] === player.name ? '✅' : '❌'
+      console.log(`   ${index + 1}. ${player.name}${expectedName} ${nameMatch} (${player.role}, ${player.age} años, ${player.gender || 'N/A'}) ${isKiller ? '🔴 [ASESINO]' : '✅ Inocente'}`)
     })
     
     // Verificar que los nombres coincidan
@@ -150,13 +138,13 @@ async function testGenerateInitialCase() {
     if (testData.playerNames) {
       let allMatch = true
       testData.playerNames.forEach((expectedName, index) => {
-        const actualName = data.suspects[index]?.name
+        const actualName = data.players[index]?.name
         const matches = actualName === expectedName
         if (!matches) {
           allMatch = false
-          console.log(`   ❌ suspect-${index + 1}: Esperado "${expectedName}", pero recibió "${actualName}"`)
+          console.log(`   ❌ player-${index + 1}: Esperado "${expectedName}", pero recibió "${actualName}"`)
         } else {
-          console.log(`   ✅ suspect-${index + 1}: "${expectedName}" - CORRECTO`)
+          console.log(`   ✅ player-${index + 1}: "${expectedName}" - CORRECTO`)
         }
       })
       if (allMatch) {
@@ -164,6 +152,20 @@ async function testGenerateInitialCase() {
       } else {
         console.log('\n❌ Algunos nombres no coinciden con los esperados')
       }
+    }
+
+    // Verificar que hay exactamente un asesino
+    const killers = data.players.filter((p: any) => p.isKiller === true)
+    console.log('\n🔍 Verificación del asesino:')
+    if (killers.length === 1) {
+      console.log(`   ✅ Hay exactamente un asesino: ${killers[0].name} (${killers[0].id})`)
+      if (killers[0].id === data.hiddenContext.killerId) {
+        console.log(`   ✅ El ID del asesino coincide con hiddenContext.killerId`)
+      } else {
+        console.log(`   ⚠️  El ID del asesino (${killers[0].id}) no coincide con hiddenContext.killerId (${data.hiddenContext.killerId})`)
+      }
+    } else {
+      console.log(`   ❌ Error: Se esperaba 1 asesino, pero se encontraron ${killers.length}`)
     }
 
     console.log('\n🔍 Detalles del caso:')
@@ -176,16 +178,25 @@ async function testGenerateInitialCase() {
     console.log(`   Ubicación: ${data.victim.location || 'N/A'}`)
     console.log(`   Descubierto por: ${data.victim.discoveredBy || 'N/A'}`)
 
+    console.log('\n🔍 Información del asesino (para verificación):')
+    const killer = data.players.find((p: any) => p.isKiller === true)
+    if (killer) {
+      console.log(`   Nombre: ${killer.name}`)
+      console.log(`   Coartada: ${killer.alibi?.substring(0, 80)}...`)
+      console.log(`   Motivo de sospecha: ${killer.whySuspicious?.substring(0, 80)}...`)
+      console.log(`   Contexto adicional: ${killer.additionalContext?.substring(0, 100)}...`)
+    }
+
     console.log('\n✅ Test completado exitosamente!')
     
     // Guardar respuesta completa en un archivo para inspección
     const fs = await import('fs/promises')
     await fs.writeFile(
-      'test-response.json',
+      'test-impostor-response.json',
       JSON.stringify(data, null, 2),
       'utf-8'
     )
-    console.log('💾 Respuesta completa guardada en test-response.json')
+    console.log('💾 Respuesta completa guardada en test-impostor-response.json')
 
   } catch (error) {
     console.error('❌ Error al ejecutar el test:')
@@ -208,5 +219,5 @@ async function testGenerateInitialCase() {
 }
 
 // Ejecutar el test
-testGenerateInitialCase()
+testGenerateImpostorCase()
 
