@@ -181,6 +181,29 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       parsedCase = JSON.parse(cleanedResponse)
     }
     
+    // PRIMERO: Si hay nombres proporcionados, sobrescribirlos ANTES de hacer el matching
+    if (parsedCase.suspects && playerNames && playerNames.length > 0) {
+      console.log('🔧 Applying provided player names to suspects...')
+      parsedCase.suspects = parsedCase.suspects.map((suspect: any, index: number) => {
+        // Asegurar que name sea un string válido
+        let name: string = suspect.name
+        if (typeof name === 'object' && name !== null) {
+          name = (name as any).toString() || String(name)
+          console.warn(`⚠️ Suspect ${index + 1} name was an object, converted to: "${name}"`)
+        } else if (typeof name !== 'string') {
+          name = String(name || '')
+        }
+        
+        // Si hay un nombre proporcionado para este índice, usarlo
+        if (playerNames[index]) {
+          name = playerNames[index]
+          console.log(`✅ Applied provided name for suspect-${index + 1}: "${name}"`)
+        }
+        
+        return { ...suspect, name: name }
+      })
+    }
+
     // Asignar URLs reales de Supabase a los sospechosos
     if (parsedCase.suspects && selectedSuspects) {
       console.log('🔧 Matching suspects to Supabase photos...')
@@ -209,6 +232,14 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       }
 
       parsedCase.suspects = parsedCase.suspects.map((gen) => {
+        // Asegurar que name sea un string (ya lo aplicamos antes, pero por si acaso)
+        let name: string = gen.name
+        if (typeof name === 'object' && name !== null) {
+          name = (name as any).toString() || String(name)
+        } else if (typeof name !== 'string') {
+          name = String(name || '')
+        }
+        
         let best = null as any
         let bestScore = -1
         
@@ -227,11 +258,36 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
 
         if (best?.id) usedIds.add(best.id)
 
-        if (best?.image_url) {
-          console.log(`✅ Matched "${gen.name}" → ${best.occupation?.es}`)
-          return { ...gen, photo: best.image_url }
+        const updatedSuspect = { 
+          ...gen, 
+          name: name, // Asegurar que name sea siempre un string
+          photo: best?.image_url || gen.photo 
         }
-        return gen
+
+        if (best?.image_url) {
+          console.log(`✅ Matched "${name}" → ${best.occupation?.es}`)
+        }
+        
+        return updatedSuspect
+      })
+    } else if (parsedCase.suspects) {
+      // Aunque no haya selectedSuspects, asegurar que los nombres sean strings
+      parsedCase.suspects = parsedCase.suspects.map((gen: any, index: number) => {
+        let name: string = gen.name
+        if (typeof name === 'object' && name !== null) {
+          name = (name as any).toString() || String(name)
+          console.warn(`⚠️ Suspect ${index + 1} name was an object, converted to: "${name}"`)
+        } else if (typeof name !== 'string') {
+          name = String(name || '')
+        }
+        
+        // Si hay nombres proporcionados por el usuario, usar esos
+        if (playerNames && playerNames.length > index && playerNames[index]) {
+          name = playerNames[index]
+          console.log(`✅ Applied provided name for suspect-${index + 1}: "${name}"`)
+        }
+        
+        return { ...gen, name: name }
       })
     }
 
