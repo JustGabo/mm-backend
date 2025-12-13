@@ -74,12 +74,14 @@ async function testGenerateInitialCase() {
   // Datos de prueba
   const testData = {
     caseType: 'asesinato',
-    suspects: 3,
+    suspects: 4,
     clues: 8,
     scenario: 'mansion',
     difficulty: 'normal',
     style: 'realistic' as const,
-    language: 'es'
+    language: 'es',
+    playerNames: ['Luna', 'Gabriel', 'Alan', 'Leslie'],
+    playerGenders: ['female', 'male', 'male', 'female']
   }
 
   console.log('📤 Enviando petición con los siguientes datos:')
@@ -126,8 +128,31 @@ async function testGenerateInitialCase() {
     console.log('👥 Sospechosos:')
     data.suspects.forEach((suspect: any, index: number) => {
       const isGuilty = suspect.id === data.hiddenContext.guiltyId
-      console.log(`   ${index + 1}. ${suspect.name} (${suspect.role}, ${suspect.age} años) ${isGuilty ? '🔴 [CULPABLE]' : ''}`)
+      const expectedName = testData.playerNames?.[index] ? ` [Esperado: ${testData.playerNames[index]}]` : ''
+      const nameMatch = testData.playerNames?.[index] === suspect.name ? '✅' : '❌'
+      console.log(`   ${index + 1}. ${suspect.name}${expectedName} ${nameMatch} (${suspect.role}, ${suspect.age} años, ${suspect.gender}) ${isGuilty ? '🔴 [CULPABLE]' : ''}`)
     })
+    
+    // Verificar que los nombres coincidan
+    console.log('\n🔍 Verificación de nombres:')
+    if (testData.playerNames) {
+      let allMatch = true
+      testData.playerNames.forEach((expectedName, index) => {
+        const actualName = data.suspects[index]?.name
+        const matches = actualName === expectedName
+        if (!matches) {
+          allMatch = false
+          console.log(`   ❌ suspect-${index + 1}: Esperado "${expectedName}", pero recibió "${actualName}"`)
+        } else {
+          console.log(`   ✅ suspect-${index + 1}: "${expectedName}" - CORRECTO`)
+        }
+      })
+      if (allMatch) {
+        console.log('\n✅ Todos los nombres coinciden correctamente!')
+      } else {
+        console.log('\n❌ Algunos nombres no coinciden con los esperados')
+      }
+    }
 
     console.log('\n🔍 Detalles del caso:')
     console.log(`   Descripción: ${data.caseDescription.substring(0, 100)}...`)

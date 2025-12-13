@@ -293,14 +293,22 @@ function createInitialCasePrompt(
 `).join('\n')
 
   const namesInfo = playerNames.length > 0 
-    ? `\n**NOMBRES DE SOSPECHOSOS PROPORCIONADOS:**\n${playerNames.map((name, i) => {
+    ? `\n**🚨 NOMBRES OBLIGATORIOS - DEBES USAR ESTOS NOMBRES EXACTOS:**\n${playerNames.map((name, i) => {
         const gender = playerGenders[i] || 'unknown'
-        return `- Suspect ${i + 1}: ${name} (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
-      }).join('\n')}\n\nUsa estos nombres EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que nombres, genera nombres apropiados para los restantes basándote en el género y ocupación de cada uno.\n`
+        return `- suspect-${i + 1} DEBE llamarse "${name}" (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
+      }).join('\n')}\n\n⚠️ **CRÍTICO - LEE CON ATENCIÓN:**
+- El sospechoso con id "suspect-1" DEBE tener el nombre "${playerNames[0] || 'NOMBRE_GENERADO'}"
+${playerNames[1] ? `- El sospechoso con id "suspect-2" DEBE tener el nombre "${playerNames[1]}"` : ''}
+${playerNames[2] ? `- El sospechoso con id "suspect-3" DEBE tener el nombre "${playerNames[2]}"` : ''}
+${playerNames[3] ? `- El sospechoso con id "suspect-4" DEBE tener el nombre "${playerNames[3]}"` : ''}
+- NO inventes nombres diferentes. NO uses variaciones. Usa EXACTAMENTE los nombres proporcionados.
+- Si hay más sospechosos que nombres proporcionados, genera nombres apropiados SOLO para los sospechosos que no tienen nombre asignado (suspect-${playerNames.length + 1}, suspect-${playerNames.length + 2}, etc.).\n`
     : '\n**NOMBRES:** Genera nombres apropiados para todos los sospechosos basándote en el género y ocupación de cada uno.\n'
   
   const gendersInfo = playerGenders.length > 0
-    ? `\n**GÉNEROS DE SOSPECHOSOS PROPORCIONADOS:**\n${playerGenders.map((gender, i) => `- Suspect ${i + 1}: ${gender}`).join('\n')}\n\nUsa estos géneros EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que géneros, asigna géneros apropiados basándote en la ocupación y otros factores.\n`
+    ? `\n**🚨 GÉNEROS OBLIGATORIOS - DEBES USAR ESTOS GÉNEROS EXACTOS:**\n${playerGenders.map((gender, i) => `- suspect-${i + 1} DEBE tener gender "${gender}"`).join('\n')}\n\n⚠️ **CRÍTICO:**
+- Usa estos géneros EXACTOS para los sospechosos en el orden proporcionado.
+- Si hay más sospechosos que géneros proporcionados, asigna géneros apropiados basándote en la ocupación y otros factores SOLO para los sospechosos sin género asignado.\n`
     : '\n**GÉNEROS:** Asigna géneros apropiados a todos los sospechosos basándote en la ocupación y otros factores.\n'
 
   const weaponInfo = selectedWeapon ? `
@@ -327,7 +335,13 @@ ${gendersInfo}
 
 **REGLAS PARA SOSPECHOSOS:**
 1. Usa EXACTAMENTE los géneros, edades y ocupaciones proporcionados
-2. ${playerNames.length > 0 ? 'Usa los nombres proporcionados cuando estén disponibles, genera nombres apropiados para los restantes' : 'Genera nombres que coincidan con el género'}
+2. ${playerNames.length > 0 ? `🚨 **NOMBRES OBLIGATORIOS - DEBES USAR EXACTAMENTE ESTOS NOMBRES:**
+   - suspect-1 → nombre: "${playerNames[0]}"
+   ${playerNames[1] ? `   - suspect-2 → nombre: "${playerNames[1]}"` : ''}
+   ${playerNames[2] ? `   - suspect-3 → nombre: "${playerNames[2]}"` : ''}
+   ${playerNames[3] ? `   - suspect-4 → nombre: "${playerNames[3]}"` : ''}
+   - NO inventes nombres. NO uses variaciones. NO cambies estos nombres.
+   - Si hay más sospechosos que nombres, genera nombres apropiados SOLO para los sospechosos sin nombre asignado.` : 'Genera nombres que coincidan con el género'}
 3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
 4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
 5. **IMPORTANTE:** Todos deben tener "suspicious": true
@@ -427,7 +441,7 @@ En el objeto "hiddenContext" incluye:
   "suspects": [
     {
       "id": "suspect-1",
-      "name": "Nombre",
+      "name": "${playerNames[0] || 'Nombre generado apropiado'}",
       "age": 35,
       "role": "Ocupación exacta de Supabase",
       "description": "Descripción de personalidad",
@@ -438,8 +452,23 @@ En el objeto "hiddenContext" incluye:
       "photo": "URL de Supabase",
       "traits": ["trait1", "trait2", "trait3"],
       "lastSeen": "Última vez visto",
-      "gender": "male/female"
-    }
+      "gender": "${playerGenders[0] || 'male/female'}"
+    }${playerNames[1] ? `,
+    {
+      "id": "suspect-2",
+      "name": "${playerNames[1]}",
+      "gender": "${playerGenders[1] || 'male/female'}"
+    }` : ''}${playerNames[2] ? `,
+    {
+      "id": "suspect-3",
+      "name": "${playerNames[2]}",
+      "gender": "${playerGenders[2] || 'male/female'}"
+    }` : ''}${playerNames[3] ? `,
+    {
+      "id": "suspect-4",
+      "name": "${playerNames[3]}",
+      "gender": "${playerGenders[3] || 'male/female'}"
+    }` : ''}
   ],
   ${caseType === 'asesinato' ? `"weapon": {
     "id": "weapon-1",
@@ -460,6 +489,10 @@ En el objeto "hiddenContext" incluye:
 **CRÍTICO - LEER ATENTAMENTE:**
 - ⚠️ **EL CULPABLE OBLIGATORIAMENTE ES: suspect-${randomGuiltyIndex}**
 - ⚠️ **NO cambies este ID bajo ninguna circunstancia**
+${playerNames.length > 0 ? `- 🚨 **NOMBRES OBLIGATORIOS - DEBES USAR EXACTAMENTE ESTOS NOMBRES:**
+  ${playerNames.map((name, i) => `  - suspect-${i + 1} → "${name}"`).join('\n  ')}
+  - NO inventes nombres diferentes. NO uses variaciones. NO cambies estos nombres bajo ninguna circunstancia.
+  - Si hay más sospechosos que nombres, genera nombres apropiados SOLO para los sospechosos sin nombre asignado.` : ''}
 - El culpable (suspect-${randomGuiltyIndex}) queda FIJO desde ahora y NO cambiará durante el juego
 - TODOS los sospechosos deben parecer culpables con motivos fuertes
 - Las pistas sutiles que solo apuntan a suspect-${randomGuiltyIndex} son las que revelarán al culpable
