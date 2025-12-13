@@ -1,27 +1,10 @@
 import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 
-export const generateImpostorDiscussionRouter = Router();
-
-// Lazy initialization - solo crea el cliente cuando se necesite
-let openaiClient: OpenAI | null = null
-
-function getOpenAIClient(): OpenAI {
-  if (openaiClient) {
-    return openaiClient
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not defined')
-  }
-
-  openaiClient = new OpenAI({
-    apiKey: apiKey,
-  })
-  
-  return openaiClient
-}
+const router = Router();
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export interface ImpostorDiscussionRequest {
   roundNumber: number;
@@ -73,7 +56,7 @@ export interface ImpostorDiscussionResponse {
   targetedPlayers?: string[];
 }
 
-generateImpostorDiscussionRouter.post('/', async (req: Request, res: Response) => {
+router.post('/api/generate-impostor-discussion', async (req: Request, res: Response) => {
   try {
     console.log('API Route: generate-impostor-discussion called');
     
@@ -92,7 +75,6 @@ generateImpostorDiscussionRouter.post('/', async (req: Request, res: Response) =
 
     console.log(`🤖 Calling OpenAI for discussion round ${body.roundNumber}...`);
     
-    const openai = getOpenAIClient()
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -680,3 +662,4 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 - **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
 `
 }
+export default router;
