@@ -33,6 +33,8 @@ export interface InitialCaseGenerationRequest {
   difficulty: string
   style?: 'realistic' | 'pixel'
   language?: string
+  playerNames?: string[]
+  playerGenders?: string[]
 }
 
 export interface InitialCaseResponse {
@@ -106,14 +108,16 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       )
     }
 
-    const { language = 'es' } = body
+    const { language = 'es', playerNames = [], playerGenders = [] } = body
 
     // Obtener sospechosos reales desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
+    
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: body.scenario,
       style: body.style,
+      preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     })
     
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
@@ -135,7 +139,7 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     console.log(`🎲 Random guilty suggestion: suspect-${randomGuiltyIndex}`)
 
     // Crear prompt para OpenAI
-    const prompt = createInitialCasePrompt(body, selectedSuspects, selectedWeapon, language, randomGuiltyIndex)
+    const prompt = createInitialCasePrompt(body, selectedSuspects, selectedWeapon, language, randomGuiltyIndex, playerNames, playerGenders)
 
     console.log('🤖 Calling OpenAI for initial case generation...')
     
@@ -274,7 +278,9 @@ function createInitialCasePrompt(
   selectedSuspects: any[],
   selectedWeapon: any,
   language: string,
-  randomGuiltyIndex: number
+  randomGuiltyIndex: number,
+  playerNames: string[],
+  playerGenders: string[]
 ): string {
   const { caseType, suspects, clues, scenario, difficulty } = request
 
@@ -285,6 +291,17 @@ function createInitialCasePrompt(
 - Tags: ${s.tags?.join(', ') || 'sin tags'}
 - URL de imagen: ${s.image_url}
 `).join('\n')
+
+  const namesInfo = playerNames.length > 0 
+    ? `\n**NOMBRES DE SOSPECHOSOS PROPORCIONADOS:**\n${playerNames.map((name, i) => {
+        const gender = playerGenders[i] || 'unknown'
+        return `- Suspect ${i + 1}: ${name} (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
+      }).join('\n')}\n\nUsa estos nombres EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que nombres, genera nombres apropiados para los restantes basándote en el género y ocupación de cada uno.\n`
+    : '\n**NOMBRES:** Genera nombres apropiados para todos los sospechosos basándote en el género y ocupación de cada uno.\n'
+  
+  const gendersInfo = playerGenders.length > 0
+    ? `\n**GÉNEROS DE SOSPECHOSOS PROPORCIONADOS:**\n${playerGenders.map((gender, i) => `- Suspect ${i + 1}: ${gender}`).join('\n')}\n\nUsa estos géneros EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que géneros, asigna géneros apropiados basándote en la ocupación y otros factores.\n`
+    : '\n**GÉNEROS:** Asigna géneros apropiados a todos los sospechosos basándote en la ocupación y otros factores.\n'
 
   const weaponInfo = selectedWeapon ? `
 **ARMA HOMICIDA:**
@@ -305,10 +322,12 @@ Genera la introducción de un caso de misterio con la siguiente configuración:
 
 **SOSPECHOSOS DE SUPABASE:**
 ${suspectsInfo}
+${namesInfo}
+${gendersInfo}
 
 **REGLAS PARA SOSPECHOSOS:**
 1. Usa EXACTAMENTE los géneros, edades y ocupaciones proporcionados
-2. Genera nombres que coincidan con el género
+2. ${playerNames.length > 0 ? 'Usa los nombres proporcionados cuando estén disponibles, genera nombres apropiados para los restantes' : 'Genera nombres que coincidan con el género'}
 3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
 4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
 5. **IMPORTANTE:** Todos deben tener "suspicious": true

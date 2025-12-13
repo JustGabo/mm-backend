@@ -26,9 +26,12 @@ export class SuspectService {
    * Obtiene sospechosos inteligentemente: del escenario + extras
    */
   static async getSuspectsForScene(options: SuspectSelectionOptions): Promise<Suspect[]> {
-    const { count, scene, style } = options
+    const { count, scene, style, preferredGenders } = options
 
     console.log('🔍 SUSPECT SERVICE: Getting', count, 'suspects for scene:', scene || 'random', 'with style:', style || 'any')
+    if (preferredGenders && preferredGenders.length > 0) {
+      console.log('🔍 SUSPECT SERVICE: Preferred genders:', preferredGenders.join(', '))
+    }
 
     // Probar la conexión primero
     const connectionTest = await testSupabaseConnection()
@@ -302,14 +305,50 @@ export class SuspectService {
       console.log(`⚠️ Removed ${result.length - uniqueResult.length} duplicate suspects`)
     }
 
-    console.log(`🎯 FINAL RESULT: Returning ${uniqueResult.length} unique suspects:`)
-    uniqueResult.forEach((suspect, index) => {
+    // Si hay preferredGenders, priorizar sospechosos que coincidan con los géneros
+    let finalResult = uniqueResult
+    if (preferredGenders && preferredGenders.length > 0 && uniqueResult.length > 0) {
+      console.log(`🔍 Filtering by preferred genders: ${preferredGenders.join(', ')}`)
+      
+      // Separar sospechosos que coinciden y los que no
+      const matching: Suspect[] = []
+      const nonMatching: Suspect[] = []
+      
+      uniqueResult.forEach(suspect => {
+        const suspectGender = suspect.gender?.toLowerCase()
+        if (suspectGender && preferredGenders.some(g => g.toLowerCase() === suspectGender)) {
+          matching.push(suspect)
+        } else {
+          nonMatching.push(suspect)
+        }
+      })
+            
+      // Priorizar los que coinciden, pero si no hay suficientes, completar con los que no coinciden
+      if (matching.length >= count) {
+        // Si hay suficientes que coinciden, usar solo esos (mezclados)
+        const shuffled = matching.sort(() => Math.random() - 0.5)
+        finalResult = shuffled.slice(0, count)
+        console.log(`   ✅ Using only matching suspects (${finalResult.length})`)
+      } else {
+        // Si no hay suficientes, usar todos los que coinciden + completar con los que no
+        const shuffledMatching = matching.sort(() => Math.random() - 0.5)
+        const shuffledNonMatching = nonMatching.sort(() => Math.random() - 0.5)
+        const needed = count - matching.length
+        finalResult = [...shuffledMatching, ...shuffledNonMatching.slice(0, needed)]
+        console.log(`   ✅ Using ${matching.length} matching + ${needed} non-matching suspects`)
+      }
+    }
+
+    finalResult.forEach((suspect, index) => {
       const tags = suspect.tags?.join(', ') || 'no-tags'
       const isExtra = suspect.tags?.includes('extra') ? '⭐ EXTRA' : ''
-      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
+      const genderMatch = preferredGenders && preferredGenders.length > 0 && suspect.gender 
+        ? (preferredGenders.some(g => g.toLowerCase() === suspect.gender?.toLowerCase()) ? '✅' : '❌')
+        : ''
+      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} ${genderMatch} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
     })
 
-    return uniqueResult
+    return finalResult
   }
 
   /**
