@@ -12,8 +12,6 @@ console.log('🔧 Loading routes...');
 // Importar rutas - puede fallar si hay errores en las importaciones
 import { generateRoundRouter } from './routes/generate-round.js';
 import { generateInitialCaseRouter } from './routes/generate-initial-case.js';
-import { generateImpostorCaseRouter } from './routes/generate-impostor-case.js';
-import { generateImpostorDiscussionRouter } from './routes/generate-impostor-discussion.js';
 import { healthRouter } from './routes/health.js';
 console.log('✅ Routes loaded successfully');
 
@@ -21,35 +19,14 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS Configuration
-// Normalizar URLs: remover barras finales y espacios
-const normalizeUrl = (url: string): string => {
-  return url.trim().replace(/\/+$/, ''); // Remover barras finales
-};
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:3000'];
 
-const allowedOrigins: string[] = [];
-
-// Agregar URLs desde FRONTEND_URL
-if (process.env.FRONTEND_URL) {
-  const urls = process.env.FRONTEND_URL.split(',').map(normalizeUrl);
-  allowedOrigins.push(...urls);
-}
-
-// En producción, agregar dominios comunes del frontend
+// En producción, agregar el dominio del frontend
 if (process.env.NODE_ENV === 'production') {
-  const productionUrls = [
-    'https://misterymaker.com',
-    'https://www.misterymaker.com'
-  ];
-  productionUrls.forEach(url => {
-    if (!allowedOrigins.includes(url)) {
-      allowedOrigins.push(url);
-    }
-  });
-}
-
-// Si no hay URLs configuradas, usar localhost por defecto
-if (allowedOrigins.length === 0) {
-  allowedOrigins.push('http://localhost:3000');
+  allowedOrigins.push('https://misterymaker.com');
+  allowedOrigins.push('https://www.misterymaker.com');
 }
 
 const corsOptions = {
@@ -57,15 +34,11 @@ const corsOptions = {
     // Permitir requests sin origin (como Postman, curl, etc.)
     if (!origin) return callback(null, true);
     
-    // Normalizar el origin recibido (remover barra final)
-    const normalizedOrigin = normalizeUrl(origin);
-    
-    // Verificar si el origin está permitido (comparación exacta o normalizada)
-    if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin)) {
+    // Verificar si el origin está permitido
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       console.warn(`⚠️  CORS blocked origin: ${origin}`);
-      console.warn(`   Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -74,12 +47,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Aplicar CORS antes que cualquier otra cosa
 app.use(cors(corsOptions));
-
-// Manejar preflight requests explícitamente
-app.options('*', cors(corsOptions));
-
 app.use(express.json());
 
 // Health check
@@ -88,8 +56,6 @@ app.use('/api/health', healthRouter);
 // API Routes
 app.use('/api/generate-round', generateRoundRouter);
 app.use('/api/generate-initial-case', generateInitialCaseRouter);
-app.use('/api/generate-impostor-case', generateImpostorCaseRouter);
-app.use('/api/generate-impostor-discussion', generateImpostorDiscussionRouter);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
