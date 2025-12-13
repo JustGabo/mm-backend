@@ -1,10 +1,27 @@
 import { Router, Request, Response } from 'express';
 import OpenAI from 'openai';
 
+// Lazy initialization - solo crea el cliente cuando se necesite
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (openaiClient) {
+    return openaiClient;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not defined');
+  }
+
+  openaiClient = new OpenAI({
+    apiKey: apiKey,
+  });
+  
+  return openaiClient;
+}
+
 const router = Router();
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 export interface ImpostorDiscussionRequest {
   roundNumber: number;
@@ -75,6 +92,7 @@ router.post('/api/generate-impostor-discussion', async (req: Request, res: Respo
 
     console.log(`🤖 Calling OpenAI for discussion round ${body.roundNumber}...`);
     
+    const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [

@@ -12,6 +12,8 @@ console.log('🔧 Loading routes...');
 // Importar rutas - puede fallar si hay errores en las importaciones
 import { generateRoundRouter } from './routes/generate-round.js';
 import { generateInitialCaseRouter } from './routes/generate-initial-case.js';
+import generateImpostorCaseRouter from './routes/generate-impostor-case.js';
+import generateImpostorDiscussionRouter from './routes/generate-impostor-discussion.js';
 import { healthRouter } from './routes/health.js';
 console.log('✅ Routes loaded successfully');
 
@@ -56,6 +58,8 @@ app.use('/api/health', healthRouter);
 // API Routes
 app.use('/api/generate-round', generateRoundRouter);
 app.use('/api/generate-initial-case', generateInitialCaseRouter);
+app.use(generateImpostorCaseRouter);
+app.use(generateImpostorDiscussionRouter);
 
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

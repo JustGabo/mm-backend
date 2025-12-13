@@ -18,6 +18,12 @@ npm-debug.log*
 test-response.json
 test-impostor-response.json
 test-impostor-discussion-response.json
+test-impostor-discussion-round-*.json
+
+# Test files
+test-generate-case.ts
+test-generate-impostor-case.ts
+test-generate-impostor-discussion.ts
 
 # OS
 .DS_Store
