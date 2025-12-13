@@ -456,7 +456,7 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
    - Fomenta la discusión y análisis
 
 2. **INCONSISTENCIA (type: "inconsistency")**:
-   - Señalar inconsistencias usando EVIDENCIA OBJETIVA (cámaras, testigos, evidencia física), NO citando directamente lo que dijeron los jugadores
+   - Señalar inconsistencias usando EVIDENCIA OBJETIVA (cámaras, testigos, evidencia física), NO citando directamente lo que dijeron los jugadores porque no sabes lo que dijeron
    - **CRÍTICO: NO uses frases como "He notado que [jugador] dice..." o "[jugador] afirma que..." porque el jugador puede no haber dicho eso con tanto detalle**
    - Basarte en evidencia objetiva: cámaras de seguridad, testigos que vieron algo, evidencia física
    - **🚨 CRÍTICO - DISTRIBUCIÓN DE JUGADORES:**
@@ -490,7 +490,7 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 
 2. **FASE 4 (roundNumber 4) - Evidencias generadas:**
    - Tipo: "discovery"
-   - Genera descubrimientos/pistas CREATIVAS y VARIADAS basadas en lo que los jugadores dijeron en sus coartadas
+   - Genera descubrimientos/pistas CREATIVAS y VARIADAS basadas en lo que los jugadores tienen en sus coartadas
    - **🚨 CRÍTICO - CREATIVIDAD Y VARIEDAD:**
      * NO uses siempre los mismos tipos de pistas (cuchillo, apagón, lugar cerrado, guante)
      * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, etc.
@@ -524,7 +524,7 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 
 3. **FASE 5 (roundNumber 5) - Contradicciones directas:**
    - Tipo: "inconsistency" o "observation"
-   - Señala contradicciones usando EVIDENCIA OBJETIVA basada en las COARTADAS que los jugadores dijeron
+   - Señala contradicciones usando EVIDENCIA OBJETIVA basada en las COARTADAS que los jugadores tienen
    - **CRÍTICO: Las inconsistencias deben ser basadas en OBJETOS DEJADOS EN LA ESCENA, PISTAS FÍSICAS, o cosas que los jugadores puedan relacionar con las coartadas que anotaron en sus cuadernos**
    - **CRÍTICO: NO uses frases como "He notado que [jugador] dice..." o "[jugador] afirma que..." porque el jugador puede no haber dicho eso con tanto detalle**
    - **CRÍTICO: Usa evidencia objetiva como: objetos encontrados en la escena, huellas, evidencia física que pueda relacionarse con las coartadas**
@@ -553,7 +553,7 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 
 4. **FASE 6 (roundNumber 6) - Pistas descubiertas:**
    - Tipo: "discovery"
-   - Genera descubrimientos/pistas CREATIVAS y VARIADAS encontradas en la escena del crimen basadas en las COARTADAS que los jugadores dijeron
+   - Genera descubrimientos/pistas CREATIVAS y VARIADAS encontradas en la escena del crimen basadas en las COARTADAS que los jugadores tienen
    - **🚨 CRÍTICO - CREATIVIDAD Y VARIEDAD:**
      * NO uses siempre los mismos tipos de pistas (cuchillo, apagón, lugar cerrado, guante, huellas)
      * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, etc.
