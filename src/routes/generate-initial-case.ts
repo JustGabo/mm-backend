@@ -186,18 +186,67 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     }
 
     console.log('✅ OpenAI response received')
+    console.log(`   Response length: ${response.length} characters`)
 
     // Parsear respuesta (ya viene como JSON válido con response_format)
     let parsedCase: InitialCaseResponse
     try {
       parsedCase = JSON.parse(response)
+      console.log('✅ JSON parsed successfully on first attempt')
     } catch (parseError) {
-      // Fallback: limpiar si viene con markdown
-      const cleanedResponse = response
+      console.warn('⚠️ Error parsing JSON, attempting to fix...')
+      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
+      console.warn(`   Error: ${errorMessage}`)
+      
+      // Intentar múltiples estrategias de reparación
+      let cleanedResponse = response
         .replace(/```json\s*/g, '')
         .replace(/```\s*$/g, '')
         .trim()
-      parsedCase = JSON.parse(cleanedResponse)
+      
+      // Intentar reparar strings no terminados
+      try {
+        parsedCase = JSON.parse(cleanedResponse)
+        console.log('✅ JSON parsed successfully after cleaning markdown')
+      } catch (secondError) {
+        // Estrategia 1: Intentar encontrar y cerrar strings no terminados
+        try {
+          cleanedResponse = fixUnterminatedStrings(cleanedResponse)
+          parsedCase = JSON.parse(cleanedResponse)
+          console.log('✅ JSON reparado exitosamente usando fixUnterminatedStrings')
+        } catch (thirdError) {
+          // Estrategia 2: Intentar extraer solo el JSON válido
+          try {
+            const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              parsedCase = JSON.parse(jsonMatch[0])
+              console.log('✅ JSON reparado exitosamente extrayendo objeto principal')
+            } else {
+              throw new Error('No se encontró un objeto JSON válido')
+            }
+          } catch (fourthError) {
+            // Si todo falla, loggear el error y la respuesta para debugging
+            console.error('❌ No se pudo parsear el JSON después de múltiples intentos')
+            console.error(`   Error original: ${errorMessage}`)
+            console.error(`   Posición del error: ${errorMessage.includes('position') ? errorMessage.match(/position (\d+)/)?.[1] : 'desconocida'}`)
+            
+            // Mostrar contexto alrededor de la posición del error si está disponible
+            const positionMatch = errorMessage.match(/position (\d+)/)
+            if (positionMatch) {
+              const errorPos = parseInt(positionMatch[1])
+              const start = Math.max(0, errorPos - 200)
+              const end = Math.min(response.length, errorPos + 200)
+              console.error(`   Contexto alrededor del error (pos ${errorPos}):`)
+              console.error(`   ...${response.substring(start, end)}...`)
+            } else {
+              console.error(`   Respuesta recibida (primeros 500 chars): ${response.substring(0, 500)}`)
+              console.error(`   Respuesta recibida (últimos 500 chars): ${response.substring(Math.max(0, response.length - 500))}`)
+            }
+            console.error(`   Longitud total: ${response.length} caracteres`)
+            throw new Error(`Failed to parse JSON response: ${errorMessage}`)
+          }
+        }
+      }
     }
     
     // PRIMERO: Si hay nombres proporcionados, sobrescribirlos ANTES de hacer el matching
@@ -347,6 +396,97 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     )
   }
 })
+
+/**
+ * Intenta reparar strings no terminados en JSON
+ * Esta función detecta y cierra strings que no tienen comillas de cierre
+ */
+function fixUnterminatedStrings(jsonString: string): string {
+  let result = jsonString
+  let inString = false
+  let escapeNext = false
+  let stringStart = -1
+  const stack: number[] = [] // Para rastrear dónde empezaron los strings
+  
+  // Primera pasada: identificar strings no terminados
+  for (let i = 0; i < result.length; i++) {
+    const char = result[i]
+    
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+    
+    if (char === '\\') {
+      escapeNext = true
+      continue
+    }
+    
+    if (char === '"') {
+      if (inString) {
+        // Cerramos un string
+        inString = false
+        if (stack.length > 0) {
+          stack.pop()
+        }
+      } else {
+        // Abrimos un string
+        inString = true
+        stringStart = i
+        stack.push(i)
+      }
+    }
+  }
+  
+  // Si hay strings abiertos, intentar cerrarlos
+  if (inString && stringStart >= 0) {
+    // Buscar el último carácter válido del JSON
+    const lastBrace = result.lastIndexOf('}')
+    const lastBracket = result.lastIndexOf(']')
+    const lastValidPos = Math.max(lastBrace, lastBracket, 0)
+    
+    // Si el string abierto está antes del final válido, intentar cerrarlo
+    if (stringStart < lastValidPos) {
+      // Buscar el siguiente carácter que debería cerrar el string
+      // Buscar hacia adelante desde stringStart
+      let insertPos = stringStart + 1
+      let foundInsertPos = false
+      
+      while (insertPos < result.length && insertPos <= lastValidPos) {
+        const char = result[insertPos]
+        // Si encontramos un carácter que normalmente cerraría un valor JSON
+        if (char === ',' || char === '}' || char === ']') {
+          // Verificar que no estemos en medio de un escape
+          let isEscaped = false
+          let checkPos = insertPos - 1
+          let backslashCount = 0
+          while (checkPos >= stringStart && result[checkPos] === '\\') {
+            backslashCount++
+            checkPos--
+          }
+          isEscaped = backslashCount % 2 === 1
+          
+          if (!isEscaped) {
+            result = result.slice(0, insertPos) + '"' + result.slice(insertPos)
+            foundInsertPos = true
+            break
+          }
+        }
+        insertPos++
+      }
+      
+      // Si no encontramos un lugar apropiado, cerrar justo antes del último }
+      if (!foundInsertPos && lastValidPos > stringStart) {
+        result = result.slice(0, lastValidPos) + '"' + result.slice(lastValidPos)
+      }
+    } else {
+      // El string está al final, simplemente cerrarlo
+      result = result + '"'
+    }
+  }
+  
+  return result
+}
 
 function createInitialCasePrompt(
   request: InitialCaseGenerationRequest,
