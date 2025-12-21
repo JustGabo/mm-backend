@@ -269,6 +269,8 @@ function createDiscussionPrompt(
   const playerActivities = new Set<string>()
   const playerLocations = new Set<string>()
   const playerObjects = new Set<string>()
+  const hasGroupChat = new Set<string>()
+  const hasConversations = new Set<string>()
   
   if (request.allPlayersInfo && request.allPlayersInfo.length > 0) {
     request.allPlayersInfo.forEach(p => {
@@ -276,6 +278,7 @@ function createDiscussionPrompt(
       const whatDid = (p.whatDid || '').toLowerCase()
       const whereWas = (p.whereWas || '').toLowerCase()
       const alibi = (p.alibi || '').toLowerCase()
+      const additionalContext = (p.additionalContext || '').toLowerCase()
       
       // Detectar actividades
       if (whatDid.includes('cocinar') || whatDid.includes('preparar') || whatDid.includes('cocina')) playerActivities.add('cocinar')
@@ -304,6 +307,14 @@ function createDiscussionPrompt(
       if (whatDid.includes('libro') || whatDid.includes('libros')) playerObjects.add('libro')
       if (whatDid.includes('llave') || whatDid.includes('llaves')) playerObjects.add('llave')
       if (whatDid.includes('reloj') || whatDid.includes('relojes')) playerObjects.add('reloj')
+
+        // Detectar grupos de chat y conversaciones en additionalContext
+      if (additionalContext.includes('whatsapp') || additionalContext.includes('telegram') || additionalContext.includes('grupo de chat') || additionalContext.includes('grupo de whatsapp') || additionalContext.includes('group chat') || additionalContext.includes('group chat with') || additionalContext.includes('whatsapp group') || additionalContext.includes('telegram group') || additionalContext.includes('whatsapp group with') || additionalContext.includes('telegram group with')) {
+        hasGroupChat.add(p.name)
+      }
+      if (additionalContext.includes('conversación') || additionalContext.includes('conversaciones') || additionalContext.includes('hablamos') || additionalContext.includes('hablé con') || additionalContext.includes('chatted') || additionalContext.includes('talked') || additionalContext.includes('chatting') || additionalContext.includes('talking') || additionalContext.includes('conversation') || additionalContext.includes('chatted with') || additionalContext.includes('talked with') || additionalContext.includes('chatting with') || additionalContext.includes('talking with')) {
+        hasConversations.add(p.name)
+      }
     })
   }
   
@@ -341,6 +352,8 @@ Analiza las fichas de los jugadores y genera descubrimientos CREATIVOS y VARIADO
 **Actividades mencionadas en las coartadas:** ${Array.from(playerActivities).join(', ') || 'Ninguna específica'}
 **Ubicaciones mencionadas:** ${Array.from(playerLocations).join(', ') || 'Ninguna específica'}
 **Objetos mencionados:** ${Array.from(playerObjects).join(', ') || 'Ninguno específico'}
+**Jugadores con grupos de chat/comunicaciones:** ${Array.from(hasGroupChat).join(', ') || 'Ninguno detectado'} - Analiza el additionalContext de estos jugadores para encontrar detalles de grupos de WhatsApp, Telegram, etc.
+**Jugadores con conversaciones mencionadas:** ${Array.from(hasConversations).join(', ') || 'Ninguno detectado'} - Analiza el additionalContext de estos jugadores para encontrar detalles de conversaciones específicas
 
 **Ejemplos de pistas CREATIVAS y VARIADAS (NO uses siempre las mismas):**
 - Si jugadores mencionaron leer: "Se encontraron marcas de dedos en un libro que estaba en [lugar]"
@@ -353,6 +366,9 @@ Analiza las fichas de los jugadores y genera descubrimientos CREATIVOS y VARIADO
 - Si jugadores mencionaron estar en biblioteca: "Un libro fue movido de su posición original en la biblioteca"
 - Si jugadores mencionaron estar en jardín: "Se encontraron restos de tierra específica del jardín en [lugar]"
 - Si jugadores mencionaron estar en garaje: "El vehículo en el garaje tiene el motor aún caliente"
+- **Si hay grupos de chat/comunicaciones mencionados en las fichas (SOLO si está REALMENTE en el additionalContext)**: "Hemos descubierto que el análisis de las comunicaciones internas (grupo de WhatsApp/Telegram) revela que hubo un intercambio de mensajes entre [jugador 1], [jugador 2] y [jugador 3] justo antes del crimen, donde se discutían [tema específico de las fichas]. Esto sugiere que algunos de ustedes podrían haber tenido motivos más profundos de los que han mencionado."
+- **Si hay conversaciones específicas mencionadas (SOLO si está REALMENTE en el additionalContext)**: "Hemos recibido informes de que [jugador 1] y [jugador 2] tuvieron una conversación privada sobre [tema específico de las fichas] durante la noche del crimen."
+- **CRÍTICO**: Si NO hay grupos de chat o conversaciones mencionados en el additionalContext de NINGÚN jugador, NO generes descubrimientos sobre grupos de WhatsApp, Telegram, o conversaciones. Solo usa información que REALMENTE esté en las fichas.
 - "Se encontraron fibras de ropa específicas en la escena que no corresponden a la víctima"
 - "El análisis de ADN revela la presencia de una tercera persona en [lugar]"
 - "Los registros de seguridad muestran que una puerta fue abierta desde el interior"
@@ -367,9 +383,11 @@ Analiza las fichas de los jugadores y genera descubrimientos CREATIVOS y VARIADO
 **IMPORTANTE:** 
 - Varía los tipos de pistas entre rondas
 - NO uses siempre objetos físicos (cuchillos, guantes, etc.)
-- Considera evidencia forense, tecnológica, testimonial, ambiental, etc.
-- Basa las pistas en las actividades y ubicaciones REALES mencionadas en las fichas de los jugadores
+- Considera evidencia forense, tecnológica, testimonial, ambiental, comunicaciones (grupos de chat, mensajes), etc.
+- Basa las pistas en las actividades, ubicaciones, y CONEXIONES REALES mencionadas en las fichas de los jugadores (especialmente en el additionalContext)
+- Analiza el additionalContext de TODOS los jugadores para encontrar grupos de chat, conversaciones, relaciones, etc.
 - Sé CREATIVO y ORIGINAL, no repitas los mismos tipos de descubrimientos
+- **CRÍTICO: Solo usa información que esté REALMENTE en las fichas de los jugadores**
 
 `
     : ''
@@ -443,9 +461,8 @@ ${creativeClueSuggestions}
 - FASE 3 (roundNumber 3): Preguntas de clarificación - Genera preguntas para aclarar detalles ambiguos sobre posiciones, acciones, relaciones entre jugadores, o comportamientos observados. NO preguntes sobre tiempos porque eso ya se cubrió en la ronda 2 (coartadas oficiales).
 - FASE 4 (roundNumber 4): Evidencias generadas - Genera descubrimientos/pistas lógicas basadas en las fichas de los jugadores, como las coartadas, los motivos 
 - FASE 5 (roundNumber 5): Contradicciones directas - Compara lo que dijeron diferentes jugadores y señala contradicciones (ej: "La coartada de Carlos dice que vio la luz encendida, pero Ana dice que estaba todo oscuro. ¿Quién está mintiendo?")
-- FASE 6 (roundNumber 6): Pistas descubiertas - Genera más descubrimientos/pistas encontradas en la escena del crimen, cámaras, o evidencia física
-- FASE 7 (roundNumber 7): Presión final - Haz preguntas que generen debates entre sospechosos, para que se den cuenta de las contradicciones y pistas que se han generado.
-- FASE 8 (roundNumber 8): Revelar culpable - No se genera aquí, va directo a revelar
+- FASE 6 (roundNumber 6): Presión final - Haz preguntas que generen debates entre sospechosos, para que se den cuenta de las contradicciones y pistas que se han generado.
+- FASE 7 (roundNumber 7): Revelar culpable - No se genera aquí, va directo a revelar
 
 **TIPOS DE INTERVENCIONES DEL DETECTIVE:**
 Puedes hacer 3 tipos de intervenciones (varía entre rondas):
@@ -456,7 +473,7 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
    - Fomenta la discusión y análisis
 
 2. **INCONSISTENCIA (type: "inconsistency")**:
-   - Señalar inconsistencias usando EVIDENCIA OBJETIVA (cámaras, testigos, evidencia física), NO citando directamente lo que dijeron los jugadores porque no sabes lo que dijeron
+   - Señalar inconsistencias usando EVIDENCIA OBJETIVA (cámaras, testigos, evidencia física), NO citando directamente lo que dijeron los jugadores
    - **CRÍTICO: NO uses frases como "He notado que [jugador] dice..." o "[jugador] afirma que..." porque el jugador puede no haber dicho eso con tanto detalle**
    - Basarte en evidencia objetiva: cámaras de seguridad, testigos que vieron algo, evidencia física
    - **🚨 CRÍTICO - DISTRIBUCIÓN DE JUGADORES:**
@@ -490,22 +507,30 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 
 2. **FASE 4 (roundNumber 4) - Evidencias generadas:**
    - Tipo: "discovery"
-   - Genera descubrimientos/pistas CREATIVAS y VARIADAS basadas en lo que los jugadores tienen en sus coartadas
+   - Genera descubrimientos/pistas CREATIVAS y VARIADAS basadas SOLO en información REAL de las fichas de los jugadores
+   - **🚨 CRÍTICO - BASARSE SOLO EN INFORMACIÓN REAL:**
+     * NUNCA inventes información que no esté en las fichas de los jugadores
+     * Analiza el "additionalContext" de TODOS los jugadores para encontrar conexiones reales (grupos de chat, conversaciones, relaciones)
+     * Si mencionas algo sobre un jugador, DEBE estar explícitamente en su ficha
+     * Ejemplo: Si quieres mencionar un grupo de WhatsApp, DEBE estar mencionado en el additionalContext de los jugadores involucrados
    - **🚨 CRÍTICO - CREATIVIDAD Y VARIEDAD:**
      * NO uses siempre los mismos tipos de pistas (cuchillo, apagón, lugar cerrado, guante)
-     * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, etc.
-     * Analiza las fichas de los jugadores y genera pistas ESPECÍFICAS basadas en sus actividades y ubicaciones
-     * Sé CREATIVO: considera ADN, fibras, polen, registros electrónicos, patrones de comportamiento, etc.
+     * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, comunicaciones, etc.
+     * Analiza las fichas de los jugadores y genera pistas ESPECÍFICAS basadas en sus actividades, ubicaciones, y CONEXIONES entre ellos, cosas que inculpen
+     * Sé CREATIVO: considera ADN, registros electrónicos, grupos de chat, mensajes, conversaciones, patrones de comportamiento, etc. que puedan inculpar a jugadores específicos dejandolo implicito.
      * Revisa la sección "SUGERENCIAS DE PISTAS CREATIVAS" más abajo para ideas variadas
-   - **CRÍTICO: NO menciones nombres específicos de jugadores en el descubrimiento**
-   - **CRÍTICO: El descubrimiento debe ser general, para que los jugadores lo relacionen con las coartadas**
-   - **CRÍTICO: El descubrimiento debe hacer que los jugadores REVISEN las coartadas de otros. Ejemplos CREATIVOS:**
+   - **CRÍTICO: El descubrimiento debe tener IDENTIFICADORES que inculpen a jugadores específicos basados en información REAL de sus fichas**
+   - **CRÍTICO: Si mencionas información de un jugador, usa frases como "[jugador] nos ha confesado que..." o "Hemos descubierto que [jugador] mencionó en su coartada que..." para que sea claro que esa información vino del jugador**
+   - **CRÍTICO: El descubrimiento debe hacer que los jugadores REVISEN las coartadas y conexiones de otros. Ejemplos CREATIVOS basados en información REAL:**
      * Si varios jugadores mencionaron leer → "Se encontraron marcas de dedos en un libro que estaba en [lugar]"
      * Si varios jugadores mencionaron cocinar → "El análisis de residuos en el fregadero revela que se lavaron utensilios después del crimen"
      * Si varios jugadores mencionaron escribir → "Se encontraron restos de tinta en [lugar] que no coincide con ningún documento de la víctima"
      * Si varios jugadores mencionaron teléfonos → "Los registros de llamadas muestran actividad inusual durante el tiempo del crimen"
      * Si varios jugadores mencionaron estar en jardín → "Se encontraron restos de tierra específica del jardín en [lugar]"
      * Si varios jugadores mencionaron estar en biblioteca → "Un libro fue movido de su posición original en la biblioteca"
+      * **Si hay grupos de chat mencionados en las fichas (SOLO si está REALMENTE en el additionalContext de los jugadores)**: "Hemos descubierto que en el grupo de WhatsApp [nombre del grupo] hubo un intercambio de mensajes entre [jugador 1], [jugador 2] y [jugador 3] justo antes del crimen, donde se discutían [tema específico mencionado en las fichas]. Esto sugiere que algunos de ustedes podrían haber tenido motivos más profundos de los que han mencionado."
+      * **Si hay conversaciones específicas mencionadas (SOLO si está REALMENTE en el additionalContext de los jugadores)**: "Hemos recibido informes de que [jugador 1] y [jugador 2] (y quizá incluso hasta un tercer jugador, los que quieras incluir tú) tuvieron una conversación privada sobre [tema específico de las fichas] durante la noche del crimen."
+      * **CRÍTICO**: Si NO hay grupos de chat o conversaciones mencionados en el additionalContext de NINGÚN jugador, NO generes descubrimientos sobre grupos de WhatsApp, Telegram, o conversaciones. Solo usa información que REALMENTE esté en las fichas.
      * "Se encontraron fibras de ropa específicas en la escena que no corresponden a la víctima"
      * "El análisis de ADN revela la presencia de una tercera persona en [lugar]"
      * "Los registros de seguridad muestran que una puerta fue abierta desde el interior"
@@ -524,10 +549,11 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
 
 3. **FASE 5 (roundNumber 5) - Contradicciones directas:**
    - Tipo: "inconsistency" o "observation"
-   - Señala contradicciones usando EVIDENCIA OBJETIVA basada en las COARTADAS que los jugadores tienen
-   - **CRÍTICO: Las inconsistencias deben ser basadas en OBJETOS DEJADOS EN LA ESCENA, PISTAS FÍSICAS, o cosas que los jugadores puedan relacionar con las coartadas que anotaron en sus cuadernos**
-   - **CRÍTICO: NO uses frases como "He notado que [jugador] dice..." o "[jugador] afirma que..." porque el jugador puede no haber dicho eso con tanto detalle**
-   - **CRÍTICO: Usa evidencia objetiva como: objetos encontrados en la escena, huellas, evidencia física que pueda relacionarse con las coartadas**
+   - Señala contradicciones usando EVIDENCIA OBJETIVA basada SOLO en información REAL de las fichas de los jugadores
+   - **CRÍTICO: Las inconsistencias deben ser basadas en OBJETOS DEJADOS EN LA ESCENA, PISTAS FÍSICAS, o información REAL de las fichas que los jugadores puedan relacionar con las coartadas que anotaron en sus cuadernos**
+   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid), motivos (whySuspicious), comportamientos sospechosos (suspiciousBehavior), y contexto adicional (additionalContext)**
+   - **CRÍTICO: Si mencionas algo que un jugador dijo, usa frases como "[jugador] nos ha confesado que..." o "Según lo que [jugador] mencionó en su coartada..." para que sea claro que esa información vino del jugador**
+   - **CRÍTICO: Usa evidencia objetiva como: objetos encontrados en la escena, huellas, evidencia física que pueda relacionarse con las coartadas, o información específica de las fichas (comportamientos, conversaciones, etc.)**
    - **🚨 CRÍTICO - DISTRIBUCIÓN DE JUGADORES:**
      * NUNCA hagas focus en un solo jugador, especialmente si es el asesino
      * DEBES mencionar a AL MENOS 3-4 JUGADORES en cada inconsistencia
@@ -536,7 +562,8 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
      * Ejemplo INCORRECTO: "Hemos encontrado evidencia que contradice la coartada de [Asesino]." (SOLO menciona al asesino - PROHIBIDO)
    - **CRÍTICO: La contradicción debe ser RELEVANTE y ÚTIL para la discusión. NO uses contradicciones vagas o que no aporten nada (ej: "se escucharon gritos" sin más contexto no es útil)**
    - **CRÍTICO: NUNCA digas "esto plantea dudas", "esto contradice", "esto pone en duda" o frases similares. Solo presenta el dato objetivo.**
-   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid) y motivos (whySuspicious). NO asumas que dijeron algo sobre ruidos, comportamientos, o reacciones a menos que esté explícitamente en su ficha.**
+   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid), motivos (whySuspicious), comportamientos sospechosos (suspiciousBehavior), y contexto adicional (additionalContext). NO asumas que dijeron algo sobre ruidos, comportamientos, o reacciones a menos que esté explícitamente en su ficha.**
+   - **CRÍTICO: Si mencionas información de un jugador, usa frases como "[jugador] nos ha confesado que..." o "Según lo que [jugador] mencionó..." para que sea claro que esa información vino del jugador, no que la IA la inventó**
    - **CRÍTICO: La descripción debe variar según la dificultad:**
      * FÁCIL: Descripción completa con nombres (ej: "Hemos recibido informes de que la chimenea del salón principal estaba apagada durante el momento del crimen. Sin embargo, Clara mencionó que estaba cerca de la chimenea cuando ocurrió el asesinato.")
      * NORMAL: Solo el descubrimiento, SIN mencionar nombres (ej: "Hemos recibido informes de que la chimenea del salón principal estaba apagada durante el momento del crimen.")
@@ -545,26 +572,32 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
      * "En la escena del crimen se encontró un guante de cocina con restos de [sustancia]. Varios de ustedes mencionaron estar en la cocina."
      * "Hemos encontrado huellas dactilares en [objeto] que fue movido durante el crimen."
      * "Se encontró un objeto personal de [tipo] en la escena del crimen que no pertenece a la víctima."
-   - Ejemplo INCORRECTO: "Algunos de ustedes mencionan que estaban en lugares distintos, pero hemos recibido informes de que se escucharon gritos. ¿Cómo explican esto?" (NO es relevante ni útil, no aporta nada concreto)
-   - Ejemplo INCORRECTO: "Hemos recibido informes de que en la cocina se escuchó un golpe fuerte durante el tiempo del crimen. Sin embargo, el chef mencionó que no sabía si debería ir a ver qué sucedía. Esto es extraño, dado que estaba en la cocina donde supuestamente se escuchó el ruido." (NO asumas que el chef dijo algo sobre no saber si ir a ver - solo usa información de su ficha)
+   - Ejemplo CORRECTO basado en información REAL: "Hemos recibido informes de que varios de ustedes, incluyendo a [jugador 1], [jugador 2] y [jugador 3], mencionaron no haber escuchado ruidos extraños durante el tiempo del crimen. Sin embargo, [jugador 4] nos ha confesado que se sintió nervioso al escuchar un ruido fuerte y se alejó rápidamente. Esto plantea una discrepancia en sus relatos sobre la atmósfera esa noche. ¿Cómo explican esta diferencia en sus percepciones?" (Solo si está en las fichas)
+   - Ejemplo INCORRECTO: "Algunos de ustedes mencionan que estaban en lugares distintos, pero hemos recibido informes de que se escucharon gritos. ¿Cómo explican esto?" (NO es relevante ni útil, no aporta nada concreto, y no está basado en información real de las fichas)
+   - Ejemplo INCORRECTO: "Hemos recibido informes de que en la cocina se escuchó un golpe fuerte durante el tiempo del crimen. Sin embargo, el chef mencionó que no sabía si debería ir a ver qué sucedía. Esto es extraño, dado que estaba en la cocina donde supuestamente se escuchó el ruido." (NO asumas que el chef dijo algo sobre no saber si ir a ver - solo usa información de su ficha. Si está en su ficha, di "[chef] nos ha confesado que...")
    - Ejemplo INCORRECTO: "He notado que Fernando dice que estaba en su oficina desde las 9:45pm hasta las 10:15pm, pero también afirma que estaba en la cocina a las 10:10pm" (NO citar directamente lo que dijo)
    - Ejemplo INCORRECTO: "Laura, mencionaste que estabas en el salón, pero tu coartada dice que estabas en el estudio" (NO hacer focus en un solo jugador ni citar directamente)
    - Usa la información completa de jugadores para encontrar contradicciones reales basadas en evidencia objetiva que sean RELEVANTES y ÚTILES
 
 4. **FASE 6 (roundNumber 6) - Pistas descubiertas:**
    - Tipo: "discovery"
-   - Genera descubrimientos/pistas CREATIVAS y VARIADAS encontradas en la escena del crimen basadas en las COARTADAS que los jugadores tienen
+   - Genera descubrimientos/pistas CREATIVAS y VARIADAS encontradas en la escena del crimen basadas SOLO en información REAL de las fichas de los jugadores
+   - **🚨 CRÍTICO - BASARSE SOLO EN INFORMACIÓN REAL:**
+     * NUNCA inventes información que no esté en las fichas de los jugadores
+     * Analiza el "additionalContext" de TODOS los jugadores para encontrar conexiones reales
+     * Si mencionas algo sobre un jugador, DEBE estar explícitamente en su ficha
    - **🚨 CRÍTICO - CREATIVIDAD Y VARIEDAD:**
      * NO uses siempre los mismos tipos de pistas (cuchillo, apagón, lugar cerrado, guante, huellas)
-     * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, etc.
-     * Analiza las fichas de los jugadores y genera pistas ESPECÍFICAS basadas en sus actividades y ubicaciones
-     * Sé CREATIVO: considera ADN, fibras, polen, registros electrónicos, patrones de comportamiento, etc.
+     * Varía los tipos de evidencia: forense, tecnológica, testimonial, ambiental, comunicaciones, etc.
+     * Analiza las fichas de los jugadores y genera pistas ESPECÍFICAS basadas en sus actividades, ubicaciones, y CONEXIONES entre ellos
+     * Sé CREATIVO: considera ADN, fibras, polen, registros electrónicos, grupos de chat, mensajes, conversaciones, patrones de comportamiento, etc.
      * Revisa la sección "SUGERENCIAS DE PISTAS CREATIVAS" más abajo para ideas variadas
-     * **NO repitas el mismo tipo de descubrimiento que en FASE 4** - Si en FASE 4 fue un objeto físico, en FASE 6 usa evidencia forense o tecnológica
-   - **CRÍTICO: NO menciones nombres específicos de jugadores en el descubrimiento**
-   - **CRÍTICO: El descubrimiento debe hacer que los jugadores REVISEN las coartadas de otros, similar a FASE 4**
+     * **NO repitas el mismo tipo de descubrimiento que en FASE 4** - Si en FASE 4 fue un objeto físico, en FASE 6 usa evidencia forense, tecnológica, o comunicaciones
+   - **CRÍTICO: El descubrimiento debe tener IDENTIFICADORES que inculpen a jugadores específicos basados en información REAL de sus fichas**
+   - **CRÍTICO: Si mencionas información de un jugador, usa frases como "[jugador] nos ha confesado que..." o "Hemos descubierto que [jugador] mencionó en su coartada que..." para que sea claro que esa información vino del jugador**
+   - **CRÍTICO: El descubrimiento debe hacer que los jugadores REVISEN las coartadas y conexiones de otros, similar a FASE 4**
    - **CRÍTICO: NUNCA digas "esto plantea dudas", "esto contradice", "esto pone en duda" o frases similares. Solo presenta el dato objetivo.**
-   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid) y motivos (whySuspicious).**
+   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid), motivos (whySuspicious), comportamientos sospechosos (suspiciousBehavior), y contexto adicional (additionalContext).**
    - **CRÍTICO: La descripción debe variar según la dificultad (igual que FASE 4):**
      * FÁCIL: Descripción completa del descubrimiento con contexto
      * NORMAL: Solo el descubrimiento básico, SIN interpretaciones ni sugerencias
@@ -580,21 +613,25 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
    - Los descubrimientos deben ser información objetiva que los jugadores puedan relacionar con las coartadas que escucharon y anotaron
    - Los descubrimientos pueden afectar tanto a inocentes como al culpable, pero sin hacer focus solo en el culpable
 
-5. **FASE 7 (roundNumber 7) - Presión final:**
+5. **FASE 6 (roundNumber 6) - Presión final:**
    - Tipo: "question" o "observation"
-   - Haz preguntas generales que inviten a todos a reflexionar sobre lo discutido
+   - Haz preguntas generales que inviten a todos a reflexionar sobre lo discutido, basadas en información REAL de las fichas
    - **🚨 CRÍTICO - DISTRIBUCIÓN DE JUGADORES:**
      * NUNCA hagas focus en un solo jugador, especialmente si es el asesino
      * Haz preguntas que involucren a TODOS los jugadores
      * Si necesitas mencionar jugadores específicos, menciona a AL MENOS 3-4 jugadores
      * NUNCA menciones solo al asesino en una pregunta
    - **CRÍTICO: NO repitas preguntas de la ronda 2 (coartadas oficiales). NO preguntes sobre confirmar ubicaciones o quién puede confirmar coartadas, eso ya se habló.**
-   - **CRÍTICO: Evita preguntas que no tienen sentido en el gameplay (ej: "¿qué proyecto estabas trabajando?")**
-   - **CRÍTICO: Enfócate en preguntas que inviten a ANALIZAR y REFLEXIONAR sobre todo lo discutido, no en repetir información**
+   - **CRÍTICO: Evita preguntas genéricas que no dan juego (ej: "¿cómo creen que pudo haber afectado tal y tal?") - estas son muy vagas y no aportan**
+   - **CRÍTICO: Enfócate en preguntas ESPECÍFICAS basadas en información REAL de las fichas que inviten a ANALIZAR y REFLEXIONAR sobre conexiones, relaciones, conversaciones, o comportamientos específicos mencionados en las fichas**
+   - **CRÍTICO: Usa información REAL de las fichas (conversaciones, grupos de chat, relaciones, comportamientos) para hacer preguntas que den más juego**
+   - Ejemplo CORRECTO basado en información REAL: "Hemos notado que varios de ustedes mencionaron estar trabajando en diferentes áreas, pero [jugador 1] nos ha confesado que escuchó un ruido fuerte, mientras que [jugador 2] y [jugador 3] mencionaron no haber escuchado nada. Considerando las disputas recientes con [víctima] que algunos de ustedes han mencionado, ¿cómo creen que esto pudo haber afectado la dinámica entre ustedes?" (Solo si está en las fichas)
    - Ejemplo CORRECTO: "Basándonos en todo lo discutido y los descubrimientos, ¿quién tiene la coartada más débil?"
-   - Ejemplo CORRECTO: "Considerando todas las evidencias y contradicciones, uno de ustedes esta mintiendo"
+    - Ejemplo CORRECTO basado en información REAL: "Hemos descubierto que en el grupo de WhatsApp hubo mensajes entre [jugador 1], [jugador 2] y [jugador 3] sobre [tema específico de las fichas]. ¿Cómo explican esta conexión y qué relevancia tiene para el crimen?" (Solo si está REALMENTE en el additionalContext de las fichas)
+    - **CRÍTICO**: Si NO hay grupos de chat o conversaciones mencionados en el additionalContext de NINGÚN jugador, NO hagas preguntas sobre grupos de WhatsApp, Telegram, o conversaciones. Solo usa información que REALMENTE esté en las fichas.
    - Ejemplo INCORRECTO: "¿Quién puede confirmar su ubicación exacta durante el tiempo del crimen?" (YA se habló en ronda 2)
    - Ejemplo INCORRECTO: "[Asesino], ¿puedes explicar por qué tu coartada menciona el estudio si estabas en el salón?" (NO hacer focus en un solo jugador, especialmente si es el asesino - PROHIBIDO)
+   - Ejemplo INCORRECTO: "¿Cómo creen que pudo haber afectado tal y tal?" (Muy genérico, no da juego, no aporta)
 
 5. **REGLAS GENERALES:**
    - No debe revelar directamente quién es el asesino

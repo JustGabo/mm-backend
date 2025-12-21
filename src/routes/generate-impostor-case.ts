@@ -391,20 +391,54 @@ ${gendersInfo}
 5. Cada jugador debe tener información personal completa y detallada:
    - **isKiller**: true para UNO SOLO (player-${randomKillerIndex}), false para todos los demás
    - **description**: Descripción de personalidad EN PRIMERA PERSONA (ej: "Soy una persona...", "Tengo...")
-   - **alibi**: Coartada detallada EN PRIMERA PERSONA CON HORAS ESPECÍFICAS (ej: "Yo estaba en la cocina desde las 9:30pm hasta las 10:15pm...", "Estuve en el salón principal entre las 9:45pm y las 10:00pm...") - Si es el asesino, debe ser FALSA pero creíble y defendible. DEBE incluir horas específicas o rangos de tiempo.
-   - **location**: Dónde estaba durante el crimen (en primera persona: "Estaba en...")
-   - **whereWas**: Descripción detallada EN PRIMERA PERSONA de dónde estaba con contexto Y HORAS (ej: "Yo estaba en el salón principal, cerca de la ventana que da al jardín, desde aproximadamente las 9:40pm hasta las 10:10pm...")
-   - **whatDid**: Qué estaba haciendo EN PRIMERA PERSONA con detalles específicos Y HORAS (ej: "Estaba conversando con [nombre] sobre... desde las 9:50pm hasta las 10:05pm", "Estaba revisando... entre las 9:45pm y las 10:00pm")
+   - **alibi**: Coartada COMPLETA EN PRIMERA PERSONA que DEBE incluir TODO: dónde estaba, qué estaba haciendo, con quién (si aplica), y HORAS ESPECÍFICAS. Formato: "Yo estaba en [ubicación específica] desde las [hora inicio] hasta las [hora fin], [qué estaba haciendo específicamente]. [Detalles adicionales: con quién hablaba, qué vio, qué escuchó, etc.]" - Si es el asesino, debe ser FALSA pero creíble y defendible. Ejemplo: "Yo estaba en la bodega del barco desde las 9:30pm hasta las 10:15pm, seleccionando vinos para la cena. Estuve hablando con el chef sobre los maridajes y revisando el inventario. No escuché nada fuera de lo normal."
+   - **location**: (DEPRECADO - la información ya está en alibi) Mantener por compatibilidad pero puede ser una versión resumida del alibi
+   - **whereWas**: (DEPRECADO - la información ya está en alibi) Mantener por compatibilidad pero puede ser una versión resumida del alibi
+   - **whatDid**: (DEPRECADO - la información ya está en alibi) Mantener por compatibilidad pero puede ser una versión resumida del alibi
    - **suspiciousBehavior**: Comportamiento sospechoso EN PRIMERA PERSONA si aplica (ej: "Me vi nervioso porque...")
-- **whySuspicious**: Motivo por el que es sospechoso EN PRIMERA PERSONA (OBLIGATORIO para todos). **DEBE ser un motivo REAL, CREÍBLE y ESPECÍFICO que justifique por qué es sospechoso.** Ejemplos:
-  * "Tuve una discusión acalorada con [víctima] hace dos días porque pensó que no entregué unos informes a tiempo y me amenazó con despedirme."
-  * "Estaba cerca de la escena del crimen (en la cocina buscando hielo) cuando ocurrió el crimen, y no tengo testigos que puedan confirmarlo."
-  * "Tengo un conflicto financiero con [víctima] relacionado con [razón específica: dinero, herencia, deuda, etc.]."
-  * "La víctima me acusó públicamente de [razón específica] hace una semana, lo que me causó problemas."
-  * "Tenía acceso exclusivo al [lugar/arma] que se usó en el crimen."
-  * **CRÍTICO: TODOS los jugadores (inocentes y asesino) DEBEN tener motivos REALES y CREÍBLES. NO uses motivos vagos como "me siento incómoda con la tensión" - debe ser algo específico y concreto.**
-  * Este motivo debe ser creíble y permitir defensa. Para el asesino, debe ser un motivo que pueda explicar pero que también pueda ser contradicho por descubrimientos posteriores.
-   - **additionalContext**: Contexto adicional MUY DETALLADO EN PRIMERA PERSONA (OBLIGATORIO para todos los jugadores). Para el ASESINO: debe incluir que es el asesino, dónde realmente estaba, su coartada falsa, testigos que pueden 'confirmar' su coartada, inconsistencias posibles y cómo explicarlas. Si descubrió el cuerpo, incluir por qué estaba ahí y cómo defenderse. Para los INOCENTES: debe incluir relaciones con otros jugadores si aplica, testigos que pueden confirmar coartada si aplica, detalles específicos sobre ubicación y actividades, qué vieron/escucharon, observaciones sobre otros jugadores, información sobre la víctima si la conocían.. Debe ser tan detallado como el del asesino para evitar diferencias visuales.
+   - **whySuspicious**: Motivo por el que es sospechoso EN PRIMERA PERSONA (OBLIGATORIO para todos). **CRÍTICO: DEBE ser un motivo REAL, CREÍBLE, ESPECÍFICO y CONVINCENTE que justifique genuinamente por qué es sospechoso. NUNCA uses motivos vagos como "no tengo relación directa", "quizás mi presencia", "me siento incómodo", etc. - estos delatan inmediatamente que es inocente.** Ejemplos VÁLIDOS:
+     * "Tuve una discusión acalorada con [víctima] hace dos días porque pensó que no entregué unos informes a tiempo y me amenazó con despedirme. [Un jugador] vio nuestra pelea (Esto debe aparecer tambien en el contexto adicional del jugador o jugadores que vieron la discusion)."
+     * "Tengo un conflicto financiero con [víctima] relacionado con una deuda de $50,000 que me debe desde hace 6 meses. Le había amenazado con acciones legales la semana pasada."
+     * "La víctima me acusó públicamente de robar dinero de la caja hace una semana, lo que me causó problemas con mi jefe. Estaba considerando demandarla por difamación, [Un jugador] me dijo que me apoyaria en el proceso (esto debe aparecer en el conexto adicional de la persona mencionada)."
+     * "[Un jugador] dice que me vio salir de la escena del crimen a [hora comprometedora, pero no totalmente], pero solo estuve (excusa real si es inocente, inventada si es culpable)."
+     * "Estaba cerca de la escena del crimen cuando ocurrió, y tengo un historial de conflictos con la víctima por [razón específica]."
+     * "La víctima tenía información comprometedora sobre mí relacionada con [situación específica] que podría haber arruinado mi carrera."
+     * **IMPORTANTE: Todos los jugadores (inocentes y asesino) DEBEN tener motivos REALES y CREÍBLES que los hagan genuinamente sospechosos. El objetivo es que TODOS tengan que demostrar por qué son inocentes.**
+   - **additionalContext**: Contexto adicional MUY DETALLADO EN PRIMERA PERSONA (OBLIGATORIO para todos). **DEBE estar bien estructurado con TÍTULOS DE SECCIÓN en mayúsculas y doble salto de línea entre secciones para mejor legibilidad.** Para el ASESINO: debe incluir que es el asesino, dónde realmente estaba, su coartada falsa, testigos que pueden 'confirmar' su coartada, inconsistencias posibles y cómo explicarlas. Si descubrió el cuerpo, incluir por qué estaba ahí y cómo defenderse. Para los INOCENTES: DEBE incluir:
+     * **RELACIONES CON OTROS JUGADORES**: Qué piensa de cada uno, si tiene conflictos, amistades, desconfianzas, etc. (mínimo 2-3 jugadores). **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles (ej: "Tengo una buena relación con Sofía, pero he tenido discusiones con Carlos" en lugar de "Tengo una buena relación con el chef, pero he tenido discusiones con el empresario").**
+     * **CONVERSACIONES Y ENCUENTROS**: Detalles de conversaciones que tuvo con otros jugadores (2-3 jugadores mínimo), qué hablaron, cuándo fue, si notó algo extraño. Si tuvo una conversación con otro jugador, AMBOS deben tener esa información en su additionalContext. **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles.**
+     * **GRUPOS DE CHAT/COMUNICACIÓN** (OPCIONAL - solo si tiene sentido en el contexto): Si hay un grupo de WhatsApp, Telegram, o similar donde varios jugadores están, incluir detalles específicos:
+       - Mensajes que se enviaron en el grupo antes del crimen (fechas, horas aproximadas, contenido específico)
+       - Si alguien dijo algo sobre la víctima (puede ser broma o serio, dependiendo del jugador)
+       - Si alguien respondió de manera que pueda ser interpretada de diferentes formas
+       - **IMPORTANTE**: NO siempre incluyas grupos de chat. Solo si tiene sentido en el contexto del caso (ej: si es un museo, puede haber un grupo del personal; si es un barco, puede haber un grupo de la tripulación). Si decides incluir uno, TODOS los jugadores involucrados deben tener esa información en su additionalContext con los mismos detalles (quién dijo qué, cuándo, cómo lo interpretaron). Si no tiene sentido en el contexto, NO incluyas grupos de chat.
+     * **OBSERVACIONES SOSPECHOSAS**: Cosas que notó sobre otros jugadores que le parecieron sospechosas o extrañas (comportamientos, conversaciones, movimientos, discusiones con la víctima, etc.). **CRÍTICO: VARÍA las observaciones - NO siempre menciones al culpable como ansioso/nervioso. También menciona a otros sospechosos que parecían nerviosos, ansiosos, o comportándose de manera extraña. Distribuye las observaciones entre diferentes jugadores. Usa los NOMBRES de los jugadores, NO sus roles.**
+     * **VISTAZOS Y MOMENTOS COMPARTIDOS**: Si vio a alguien en algún lugar específico, si compartió un momento con alguien, detalles de esos encuentros. **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles.**
+     * **RELACIONES PROFUNDAS**: Conexiones más profundas con algunos jugadores (trabajaron juntos antes, tienen historia, comparten secretos, etc.). **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles.**
+     * **TESTIGOS Y CONFIRMACIONES**: Quién puede confirmar su coartada, quién lo vio, con quién habló. **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles.**
+     * **QUÉ VIO/ESCUCHÓ**: Detalles específicos de lo que observó durante el tiempo del crimen
+     * **INFORMACIÓN SOBRE LA VÍCTIMA**: Si la conocía, qué relación tenían, qué pensaba de ella, si tenía conflictos. **CRÍTICO: Usa el NOMBRE de la víctima, NO su rol.**
+     * **EXPLICACIONES DE COMPORTAMIENTOS SOSPECHOSOS**: Si tiene comportamientos que podrían verse como sospechosos, si apoyó en algo malo a otro jugador, explicaciones detalladas
+     * **DETALLES QUE INVOLUCREN A VARIOS JUGADORES**: Situaciones donde 2-3 jugadores estuvieron juntos (dependiendo el número de jugadores totales, el culpable puede estar incluido también), conversaciones grupales, momentos compartidos
+     * **Formato OBLIGATORIO**: Usa TÍTULOS DE SECCIÓN en mayúsculas seguidos de dos puntos, y DOBLE salto de línea (dos líneas vacías) entre cada sección. Ejemplo:
+       "RELACIONES CON OTROS JUGADORES:
+       
+       [texto sobre relaciones]
+       
+       
+       CONVERSACIONES Y ENCUENTROS:
+       
+       [texto sobre conversaciones]
+       
+       
+       OBSERVACIONES SOSPECHOSAS:
+       
+       [texto sobre observaciones - VARÍA entre diferentes jugadores, no siempre el culpable]
+       
+       
+       [etc. con doble salto de línea entre cada sección]"
+     * **CRÍTICO**: El additionalContext debe ser TAN DETALLADO como el del asesino para evitar diferencias visuales. Incluye suficientes conexiones entre personajes para generar preguntas y descubrimientos interesantes que involucren a varios sospechosos. Las conversaciones de grupo y mensajes deben estar documentadas en las fichas de TODOS los involucrados con los mismos detalles.
+     * **CRÍTICO - CREATIVIDAD**: NO copies los ejemplos tal cual. Tómalos como INSPIRACIÓN y sé CREATIVO. Varía el contenido, las situaciones, los detalles. Cada caso debe ser único y diferente.
 
 **VÍCTIMA - DETALLES COMPLETOS:**
 Crea una víctima con TODOS estos campos:
@@ -430,12 +464,17 @@ ${discoveredByPlayerIndex === randomKillerIndex ? `
   * "Cómo defenderme de ser sospechoso por haberlo descubierto: [estrategia de defensa como 'fui el primero en llegar porque estaba cerca', 'otros también podrían haberlo encontrado', etc.]"
 ` : `
 - **UN INOCENTE (player-${discoveredByPlayerIndex}) ES QUIEN DESCUBRIÓ EL CUERPO**
-- Para este jugador inocente, debe incluir en su "additionalContext" o "whatDid":
-  * "Fui quien descubrí el cuerpo. Estaba en [lugar] porque [razón creíble]"
-  * "Qué me llamó la atención: [un ruido, un olor, algo fuera de lugar, una puerta abierta, etc.]"
-  * "Cómo encontré el cuerpo: [descripción detallada de cómo lo descubrió]"
-  * "Mi reacción: [cómo reaccioné al encontrarlo]"
-  * "Por qué estaba en ese lugar en ese momento: [razón específica y creíble]"
+- Para este jugador inocente, debe incluir en su "additionalContext" (en una sección separada):
+  
+  Descubrimiento del cuerpo:
+  
+  Fui quien descubrí el cuerpo. Estaba en [lugar] porque [razón creíble].
+  
+  Qué me llamó la atención: [un ruido, un olor, algo fuera de lugar, una puerta abierta, etc.]
+  
+  Cómo encontré el cuerpo: [descripción detallada de cómo lo descubrió]
+    
+  Por qué estaba en ese lugar en ese momento: [razón específica y creíble]
 `}
 
 ${caseType === 'asesinato' && selectedWeapon ? `
@@ -462,41 +501,50 @@ Incluye el arma con:
 - Debe tener acceso al arma o escena del crimen
 - **IMPORTANTE: El asesino SABE que es el asesino y debe tener información REAL sobre el crimen:**
   - **isKiller**: true (debe estar marcado como asesino)
-  - **alibi**: Debe ser una coartada FALSA pero CREÍBLE que el asesino va a usar para mentir (ej: "Yo estaba en la bodega eligiendo vinos para la cena y no escuché nada")
-  - **location**: Debe indicar dónde REALMENTE estaba (la escena del crimen) - información REAL para el asesino (ej: "Estaba en la cocina del barco, junto a la nevera, donde cometí el crimen")
-  - **whereWas**: Descripción detallada de dónde REALMENTE estaba durante el crimen (escena del crimen) - información REAL para el asesino
-  - **whatDid**: Qué REALMENTE estaba haciendo (cometiendo el crimen) - información REAL para el asesino (ej: "Estaba cometiendo el asesinato con el hacha en la cocina")
+  - **alibi**: Debe ser una coartada FALSA pero CREÍBLE que el asesino va a usar para mentir. Debe incluir dónde dice que estaba, qué dice que estaba haciendo, y HORAS ESPECÍFICAS. **CRÍTICO: Usa el NOMBRE del jugador, NO su rol (ej: "Estuve hablando con Sofía" en lugar de "Estuve hablando con el chef").** Ejemplo: "Yo estaba en la bodega del barco desde las 9:30pm hasta las 10:15pm, seleccionando vinos para la cena. Estuve hablando con [nombre del jugador] sobre los maridajes y revisando el inventario. No escuché nada fuera de lo normal."
+  - **location**: (DEPRECADO - usar alibi) Versión resumida de la coartada falsa
+  - **whereWas**: (DEPRECADO - usar alibi) Versión resumida de la coartada falsa
+  - **whatDid**: (DEPRECADO - usar alibi) Versión resumida de la coartada falsa
   - **suspiciousBehavior**: Comportamiento que podría ser sospechoso y cómo explicarlo/defenderse
-  - **additionalContext**: Información CRÍTICA para el asesino en primera persona que DEBE incluir:
+  - **whySuspicious**: Debe tener un motivo REAL y CREÍBLE que lo haga genuinamente sospechoso (igual que los inocentes)
+  - **additionalContext**: Información CRÍTICA para el asesino en primera persona que DEBE incluir (con espacios entre secciones):
     * "Soy el asesino. Realmente estaba en [escena del crimen exacta] cuando cometí el crimen a las [hora aproximada]."
-    * "Mi coartada falsa es: [coartada CON HORAS ESPECÍFICAS]. Debo usar esta coartada para defenderme."
-    * "Testigos que pueden 'confirmar' mi coartada falsa: [nombres de otros jugadores que podrían haber visto algo relacionado]"
-    * "Inconsistencias que podría tener: [lista de posibles inconsistencias]. Cómo explicarlas: [explicaciones creíbles]"
-    * "HORAS IMPORTANTES: Llegué a [lugar de la coartada falsa] a las [hora], pero realmente cometí el crimen a las [hora real]. Puedo decir que llegué antes para justificar mi coartada, o que llegué después si me preguntan."
+    
+    Mi coartada falsa es: [coartada CON HORAS ESPECÍFICAS]. Debo usar esta coartada para defenderme.
+    
+    Testigos que pueden 'confirmar' mi coartada falsa: [nombres de otros jugadores que podrían haber visto algo relacionado, pero que no lo salva del todo]
+    
+    Inconsistencias que podría tener: [lista de posibles inconsistencias]. Cómo explicarlas: [explicaciones creíbles]
+    
+    HORAS IMPORTANTES: Llegué a [lugar de la coartada falsa] a las [hora], pero realmente cometí el crimen a las [hora real]. Puedo decir que llegué antes para justificar mi coartada, o que llegué después si me preguntan.
     ${discoveredByPlayerIndex === randomKillerIndex ? `
-    * "IMPORTANTE: Yo fui quien 'descubrí' el cuerpo. Debo explicar por qué estaba ahí: [razón creíble como 'fui a buscar algo', 'escuché un ruido', 'necesitaba algo de la cocina', etc.]"
-    * "Cómo defenderme de ser sospechoso por haberlo descubierto: [estrategia de defensa como 'fui el primero en llegar porque estaba cerca', 'otros también podrían haberlo encontrado', 'fue casualidad que pasara por ahí', etc.]"
+    
+    IMPORTANTE: Yo fui quien 'descubrí' el cuerpo. Debo explicar por qué estaba ahí: [razón creíble como 'fui a buscar algo', 'escuché un ruido', 'necesitaba algo de la cocina', etc.]
+    
+    Cómo defenderme de ser sospechoso por haberlo descubierto: [estrategia de defensa como 'fui el primero en llegar porque estaba cerca', 'otros también podrían haberlo encontrado', 'fue casualidad que pasara por ahí', etc.]
     ` : ''}
+    * También debe incluir relaciones con otros jugadores, conversaciones que tuvo (para mantener consistencia), y observaciones sobre otros jugadores (para no delatarse)
+    * **CRÍTICO: Usa los NOMBRES de los jugadores, NO sus roles (ej: "Hablé con Sofía" en lugar de "Hablé con el chef").**
+    * **Formato OBLIGATORIO**: Usa TÍTULOS DE SECCIÓN en mayúsculas seguidos de dos puntos, y DOBLE salto de línea (dos líneas vacías) entre cada sección, igual que los inocentes.
 - Sus traits deben conectar sutilmente con el método del crimen
 
 **REGLAS SOBRE LOS OTROS JUGADORES (INOCENTES):**
 - Todos deben tener coartadas VERDADERAS
-- Deben tener ubicaciones y actividades claras EN PRIMERA PERSONA
-  - **DEBEN tener información MUY DETALLADA en primera persona CON HORAS:**
-    - Detalles específicos de dónde estaban CON HORAS ESPECÍFICAS (qué vieron, qué escucharon, con quién hablaron, a qué hora)
-    - Testigos o personas que pueden confirmar su coartada si aplica Y LAS HORAS 
-    - Contexto adicional sobre sus relaciones con otros jugadores, si aplica
-    - Información suficiente para responder preguntas específicas y defenderse
-    - Si no recuerdan bien la hora exacta, pueden tener incertidumbre (ej: "Creo que era alrededor de las 9:50pm, pero no estoy completamente seguro porque estaba distraído")
-- **IMPORTANTE: Todos los INOCENTES DEBEN tener un campo "additionalContext" con información detallada:**
-  * Relaciones con otros jugadores (qué piensan de ellos, si tienen conflictos, etc.)
-  * Testigos que pueden confirmar su coartada (nombres específicos de otros jugadores) si aplica, no es obligatorio
-  * Detalles específicos sobre su ubicación y actividades
-  * Información sobre qué vieron o escucharon durante el tiempo del crimen
-  * Cualquier detalle que pueda ser útil para defenderse o hacer acusaciones
-  * Si tienen comportamientos sospechosos, explicaciones detalladas
-  * Información sobre la víctima (si la conocían, qué relación tenían, etc.)
-  * Observaciones sobre otros jugadores que podrían ser relevantes
+- **alibi**: Debe incluir TODO: dónde estaba, qué estaba haciendo, con quién (si aplica), y HORAS ESPECÍFICAS. Debe ser completo y detallado.
+- **location**, **whereWas**, **whatDid**: (DEPRECADOS - la información ya está en alibi) Mantener por compatibilidad pero pueden ser versiones resumidas del alibi
+- **whySuspicious**: Debe tener un motivo REAL, CREÍBLE y ESPECÍFICO que lo haga genuinamente sospechoso (nunca motivos vagos)
+- **IMPORTANTE: Todos los INOCENTES DEBEN tener un campo "additionalContext" MUY DETALLADO con información estructurada (con espacios entre secciones):**
+  * **Relaciones con otros jugadores**: Qué piensa de cada uno, si tiene conflictos, amistades, desconfianzas, etc. (mínimo 2-3 jugadores)
+  * **Conversaciones y encuentros**: Detalles de conversaciones que tuvo con otros jugadores (mínimo 2-3 conversaciones con diferentes jugadores), qué hablaron, cuándo fue, si notó algo extraño. **CRÍTICO: Si un jugador tuvo una conversación con otro, AMBOS deben tener esa información en su additionalContext.**
+  * **Observaciones sospechosas**: Cosas que notó sobre otros jugadores que le parecieron sospechosas o extrañas (comportamientos, conversaciones, movimientos, etc.) - mínimo 1-2 observaciones
+  * **Vistazos y momentos compartidos**: Si vio a alguien en algún lugar específico, si compartió un momento con alguien, detalles de esos encuentros
+  * **Relaciones profundas**: Conexiones más profundas con algunos jugadores (trabajaron juntos antes, tienen historia, comparten secretos, etc.)
+  * **Testigos y confirmaciones**: Quién puede confirmar su coartada, quién lo vio, con quién habló
+  * **Qué vio/escuchó**: Detalles específicos de lo que observó durante el tiempo del crimen
+  * **Información sobre la víctima**: Si la conocía, qué relación tenían, qué pensaba de ella, si tenía conflictos
+  * **Explicaciones de comportamientos sospechosos**: Si tiene comportamientos que podrían verse como sospechosos, explicaciones detalladas
+  * **Detalles que involucren a varios jugadores**: Situaciones donde 2-3 jugadores estuvieron juntos, conversaciones grupales, momentos compartidos
+  * **Formato**: Usa saltos de línea y espacios para separar las diferentes secciones para mejor legibilidad
 - **Si un INOCENTE descubrió el cuerpo (discoveredBy = su nombre):**
   * Debe tener una razón creíble de por qué estaba en ese lugar en ese momento
   * Debe tener información sobre qué le llamó la atención (un ruido, un olor, algo fuera de lugar, etc.)
@@ -505,7 +553,7 @@ Incluye el arma con:
   * Debe poder explicar por qué estaba ahí sin parecer sospechoso
 - Algunos pueden tener comportamientos sospechosos pero son inocentes (deben tener explicación en primera persona)
 - La diferencia está en las PISTAS SUTILES que solo apuntan al asesino real (player-${randomKillerIndex})
-- **CRÍTICO: El "additionalContext" de los inocentes debe ser TAN DETALLADO como el del asesino para evitar que se note la diferencia**
+- **CRÍTICO: El "additionalContext" de los inocentes debe ser TAN DETALLADO como el del asesino para evitar que se note la diferencia. Debe incluir suficientes conexiones entre personajes para generar preguntas y descubrimientos interesantes que involucren a varios sospechosos.**
 
 **CONTEXTO OCULTO (hiddenContext):**
 En el objeto "hiddenContext" incluye:
@@ -540,13 +588,13 @@ En el objeto "hiddenContext" incluye:
       "role": "Ocupación exacta de Supabase",
       "description": "Descripción de personalidad EN PRIMERA PERSONA (ej: Soy una persona...)",
       "isKiller": false,
-      "alibi": "Coartada detallada EN PRIMERA PERSONA CON HORAS ESPECÍFICAS (ej: Yo estaba en la cocina desde las 9:30pm hasta las 10:15pm... Estuve en el salón entre las 9:45pm y las 10:00pm...)",
-      "location": "Dónde estaba durante el crimen (en primera persona)",
-      "whereWas": "Descripción detallada EN PRIMERA PERSONA de dónde estaba con contexto específico Y HORAS (ej: Yo estaba en el salón principal, cerca de la ventana, desde aproximadamente las 9:40pm hasta las 10:10pm)",
-      "whatDid": "Qué estaba haciendo EN PRIMERA PERSONA con detalles específicos Y HORAS (ej: Estaba conversando con [nombre] sobre... desde las 9:50pm hasta las 10:05pm)",
+      "alibi": "Coartada COMPLETA EN PRIMERA PERSONA que incluye TODO: dónde estaba, qué estaba haciendo, con quién (si aplica), y HORAS ESPECÍFICAS. Ejemplo: 'Yo estaba en la zona de carga del museo desde las 9:00pm hasta las 10:30pm, organizando las cajas y hablando con algunos colegas sobre la logística del evento. Estuve revisando el material de la exposición y asegurándome de que todo estuviera en orden.'",
+      "location": "Versión resumida del alibi (DEPRECADO - mantener por compatibilidad)",
+      "whereWas": "Versión resumida del alibi (DEPRECADO - mantener por compatibilidad)",
+      "whatDid": "Versión resumida del alibi (DEPRECADO - mantener por compatibilidad)",
       "suspiciousBehavior": "Comportamiento sospechoso EN PRIMERA PERSONA si aplica (opcional)",
-      "whySuspicious": "Motivo por el que es sospechoso EN PRIMERA PERSONA (ej: 'Tuve una discusión con la víctima hace dos días', 'Estaba cerca del lugar del crimen', 'Tengo un conflicto con alguien relacionado', etc.). Este motivo debe ser creíble y permitir defensa.",
-      "additionalContext": "Contexto adicional MUY DETALLADO EN PRIMERA PERSONA (OBLIGATORIO para todos). Para el ASESINO: debe incluir que es el asesino, dónde realmente estaba, su coartada falsa, testigos que pueden 'confirmar' su coartada, inconsistencias posibles y cómo explicarlas. Si descubrió el cuerpo, incluir por qué estaba ahí y cómo defenderse. Para los INOCENTES: debe incluir relaciones con otros jugadores, testigos que pueden confirmar coartada, detalles específicos sobre ubicación y actividades, qué vieron/escucharon, observaciones sobre otros jugadores, información sobre la víctima si la conocían, explicaciones de comportamientos sospechosos. Debe ser tan detallado como el del asesino para evitar diferencias visuales.",
+      "whySuspicious": "Motivo REAL, CREÍBLE y ESPECÍFICO por el que es sospechoso EN PRIMERA PERSONA. NUNCA usar motivos vagos. Ejemplo: 'Tuve una discusión acalorada con [víctima] hace dos días porque pensó que no entregué unos informes a tiempo y me amenazó con despedirme. Varios testigos vieron nuestra pelea.'",
+      "additionalContext": "Contexto adicional MUY DETALLADO EN PRIMERA PERSONA (OBLIGATORIO para todos), estructurado con TÍTULOS DE SECCIÓN en mayúsculas y DOBLE salto de línea entre secciones. Para el ASESINO: debe incluir que es el asesino, dónde realmente estaba, su coartada falsa, testigos que pueden 'confirmar' su coartada, inconsistencias posibles y cómo explicarlas. Si descubrió el cuerpo, incluir por qué estaba ahí y cómo defenderse. Para los INOCENTES: debe incluir RELACIONES CON OTROS JUGADORES (mínimo 2-3), CONVERSACIONES Y ENCUENTROS (mínimo 2-3 conversaciones - si dos jugadores hablaron, ambos deben tener esa info), GRUPOS DE CHAT/COMUNICACIÓN (OPCIONAL - solo si tiene sentido), OBSERVACIONES SOSPECHOSAS sobre otros jugadores (mínimo 1-2 - VARÍA entre diferentes jugadores, no siempre el culpable), VISTAZOS Y MOMENTOS COMPARTIDOS, RELACIONES PROFUNDAS, TESTIGOS Y CONFIRMACIONES, QUÉ VIO/ESCUCHÓ, INFORMACIÓN SOBRE LA VÍCTIMA, EXPLICACIONES DE COMPORTAMIENTOS SOSPECHOSOS, DETALLES QUE INVOLUCREN A VARIOS JUGADORES. Formato: TÍTULO EN MAYÚSCULAS seguido de dos puntos, luego doble salto de línea, luego el contenido. Ejemplo: 'RELACIONES CON OTROS JUGADORES:\n\n[contenido]\n\n\nCONVERSACIONES Y ENCUENTROS:\n\n[contenido]'",
       "photo": "URL de Supabase",
       "traits": ["trait1", "trait2", "trait3"],
       "gender": "male/female"
@@ -575,7 +623,13 @@ En el objeto "hiddenContext" incluye:
 - Todos los jugadores deben tener información suficiente para responder preguntas
 - El JSON debe ser válido, sin errores
 - Todos los strings en una sola línea
-- **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
+- **🚨 CREATIVIDAD Y VARIEDAD - CRÍTICO:**
+  * NO copies los ejemplos tal cual. Los ejemplos son solo INSPIRACIÓN.
+  * Sé CREATIVO y ORIGINAL en cada caso.
+  * Varía las situaciones, los detalles, las conexiones entre jugadores.
+  * NO uses siempre los mismos patrones o estructuras.
+  * Cada caso debe ser ÚNICO y DIFERENTE.
+- **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior, pero siendo CREATIVO y NO copiando los ejemplos literalmente.**
 `
 }
 export default router;
