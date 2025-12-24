@@ -119,3 +119,91 @@ export interface WeaponSelectionOptions {
   style?: 'realistic' | 'pixel'
   preferSpecific?: boolean // true = prefer scene-specific, false = prefer universal
 }
+
+/**
+ * Room management interfaces for shared-room mode (multijugador)
+ */
+
+export interface Room {
+  id: string
+  created_at: string
+  state: string | null
+  current_turn_player_id: string | null
+  timeline_index: number | null
+  host_id: string | null
+  max_players: number | null
+  case_data?: any // Datos del caso generado (JSONB)
+  discussion_data?: any // Datos de las rondas de discusión generadas (JSONB)
+  is_generating_discussion?: boolean // Flag para indicar que se están generando las rondas
+  accusations?: any // Acusaciones de los jugadores (JSONB)
+}
+
+export interface Player {
+  id: string
+  created_at: string
+  room_id: string
+  user_id: string | null
+  name: string | null
+  is_ready: boolean | null
+  role_data: any | null
+  joined_at: string | null
+  gender: string | null
+}
+
+/**
+ * Get players in a room
+ */
+export async function getRoomPlayers(roomId: string): Promise<{ success: boolean; error?: string; players?: Player[] }> {
+  try {
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .eq('room_id', roomId)
+      .order('joined_at', { ascending: true })
+
+    if (error) {
+      console.error('❌ Error fetching players:', error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, players: data || [] }
+  } catch (error) {
+    console.error('❌ Error fetching players:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+/**
+ * Get case data from a room
+ */
+export async function getCaseFromRoom(
+  roomId: string
+): Promise<{ success: boolean; error?: string; caseData?: any }> {
+  try {
+    console.log(`🔍 Fetching case data from room ${roomId}...`)
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('case_data')
+      .eq('id', roomId)
+      .single()
+
+    if (error) {
+      console.error('❌ Error getting case from room:', error)
+      return { success: false, error: error.message }
+    }
+
+    console.log('📦 Case data retrieved:', data?.case_data ? 'Found' : 'Not found')
+    return { success: true, caseData: data?.case_data || null }
+  } catch (error) {
+    console.error('❌ Error getting case from room:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "id": 1,
+  "title": "Motivos de Sospecha",
+  "type": "question",
+  "content": "Lola, Papito, ¿pueden explicarme por qué creen que podrían ser sospechosos en este caso? ¿Qué opinan sobre la situación de tensión con Vincent?",
+  "context": "El ambiente en el barco era tenso debido a las disputas entre los miembros del equipo.",
+  "suggestions": [
+    "Lola, ¿cómo describirías tu relación con Vincent?",
+    "Papito, ¿qué pasó durante tu discusión con Vincent?",
+    "Ambos, ¿cómo se sienten respecto a las acusaciones?"
+  ],
+  "targetedPlayers": [
+    "Lola",
+    "Papito"
+  ]
+}

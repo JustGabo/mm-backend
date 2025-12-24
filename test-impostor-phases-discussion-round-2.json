@@ -1,0 +1,17 @@
+{
+  "id": 2,
+  "title": "Coartadas en el momento del crimen",
+  "type": "question",
+  "content": "Quiero que todos expliquen sus coartadas y dónde estaban durante el momento del crimen. ¿Qué estaban haciendo todos en ese momento?",
+  "context": "Es importante aclarar quiénes estaban en el área y qué estaban haciendo para entender mejor la situación.",
+  "suggestions": [
+    "Lola, cuéntame sobre tu ubicación a las 9:15 PM.",
+    "Papito, ¿qué estabas haciendo en la Captain's Lounge en ese momento?",
+    "Ambos, ¿pueden describir lo que sucedía en la lounge antes del crimen?"
+  ],
+  "targetedPlayers": [
+    "Lola",
+    "Papito"
+  ],
+  "discovery": {}
+}
