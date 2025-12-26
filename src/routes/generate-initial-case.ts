@@ -103,216 +103,153 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     
     // Validate required fields
     if (!body.caseType || !body.suspects || !body.clues || !body.scenario || !body.difficulty) {
-      return res.status(400).json(
-        { error: 'Missing required fields' }
-      )
+      return res.status(400).json({ error: 'Missing required fields' })
     }
 
     const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body
 
-    // Normalizar playerNames: puede venir como array de strings o array de objetos { name, gender }
+    // Normalizar playerNames
     const playerNames: string[] = rawPlayerNames.map((item: any) => {
-      if (typeof item === 'string') {
-        return item
-      } else if (item && typeof item === 'object' && item.name) {
-        return item.name
-      }
+      if (typeof item === 'string') return item
+      if (item && typeof item === 'object' && item.name) return item.name
       return String(item || '')
     })
 
-    // Normalizar playerGenders: puede venir como array de strings o extraerse de los objetos
-    const playerGenders: string[] = rawPlayerGenders.length > 0 
-      ? rawPlayerGenders.map((item: any) => typeof item === 'string' ? item : String(item || ''))
-      : rawPlayerNames.map((item: any) => {
-          if (item && typeof item === 'object' && item.gender) {
-            return item.gender
-          }
-          return ''
-        }).filter(g => g)
+    // Normalizar playerGenders
+    const playerGenders: string[] =
+      rawPlayerGenders.length > 0
+        ? rawPlayerGenders.map((g: any) => typeof g === 'string' ? g : String(g || ''))
+        : rawPlayerNames
+            .map((item: any) => item?.gender || '')
+            .filter(Boolean)
 
-
-    // Obtener sospechosos reales desde Supabase
+    // Obtener sospechosos desde Supabase
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
     console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`)
+
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: body.scenario,
       style: body.style,
       preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     })
-    
+
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
 
-    // Seleccionar arma para casos de asesinato
+    // Seleccionar arma
     let selectedWeapon = null
     if (body.caseType === 'asesinato') {
       console.log(`🔫 Selecting murder weapon...`)
       selectedWeapon = await WeaponService.selectWeapon({
         scene: body.scenario,
         style: body.style,
-        preferSpecific: true
+        preferSpecific: true,
       })
       console.log(`✅ Selected weapon: ${selectedWeapon?.name?.es}`)
     }
 
-    // Generar número aleatorio para forzar variación en el culpable
     const randomGuiltyIndex = Math.floor(Math.random() * body.suspects) + 1
     console.log(`🎲 Random guilty suggestion: suspect-${randomGuiltyIndex}`)
 
-    // Crear prompt para OpenAI
-    const prompt = createInitialCasePrompt(body, selectedSuspects, selectedWeapon, language, randomGuiltyIndex, playerNames, playerGenders)
+    const prompt = createInitialCasePrompt(
+      body,
+      selectedSuspects,
+      selectedWeapon,
+      language,
+      randomGuiltyIndex,
+      playerNames,
+      playerGenders
+    )
 
     console.log('🤖 Calling OpenAI for initial case generation...')
-    
+
     const openai = getOpenAIClient()
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: 'gpt-4o-mini',
       messages: [
         {
-          role: "system",
-          content: `Crea casos de misterio. Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}. El culpable es FIJO (suspect-X indicado). NO cambies el culpable. Genera traits que apunten sutilmente al culpable. Todos parecen culpables, pero las pistas apuntan al verdadero. Responde SOLO JSON válido.`
+          role: 'system',
+          content: `Crea casos de misterio. Idioma: ${
+            language === 'es' ? 'ESPAÑOL' : 'INGLÉS'
+          }. El culpable es FIJO (suspect-X indicado). NO cambies el culpable. Responde SOLO JSON válido.`,
         },
-        {
-          role: "user",
-          content: prompt
-        }
+        { role: 'user', content: prompt },
       ],
       temperature: 0.7,
       max_tokens: 3000,
-      response_format: { type: "json_object" },
+      response_format: { type: 'json_object' },
     })
 
     const response = completion.choices[0]?.message?.content
-    if (!response) {
-      throw new Error('No response from OpenAI')
-    }
+    if (!response) throw new Error('No response from OpenAI')
 
     console.log('✅ OpenAI response received')
     console.log(`   Response length: ${response.length} characters`)
 
-    // Parsear respuesta (ya viene como JSON válido con response_format)
-    let parsedCase: InitialCaseResponse
-    try {
-      parsedCase = JSON.parse(response)
-      console.log('✅ JSON parsed successfully on first attempt')
-    } catch (parseError) {
-      console.warn('⚠️ Error parsing JSON, attempting to fix...')
-      const errorMessage = parseError instanceof Error ? parseError.message : String(parseError)
-      console.warn(`   Error: ${errorMessage}`)
-      
-      // Intentar múltiples estrategias de reparación
-      let cleanedResponse = response
-        .replace(/```json\s*/g, '')
-        .replace(/```\s*$/g, '')
-        .trim()
-      
-      // Intentar reparar strings no terminados
-      try {
-        parsedCase = JSON.parse(cleanedResponse)
-        console.log('✅ JSON parsed successfully after cleaning markdown')
-      } catch (secondError) {
-        // Estrategia 1: Intentar encontrar y cerrar strings no terminados
-        try {
-          cleanedResponse = fixUnterminatedStrings(cleanedResponse)
-          parsedCase = JSON.parse(cleanedResponse)
-          console.log('✅ JSON reparado exitosamente usando fixUnterminatedStrings')
-        } catch (thirdError) {
-          // Estrategia 2: Intentar extraer solo el JSON válido
-          try {
-            const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/)
-            if (jsonMatch) {
-              parsedCase = JSON.parse(jsonMatch[0])
-              console.log('✅ JSON reparado exitosamente extrayendo objeto principal')
-            } else {
-              throw new Error('No se encontró un objeto JSON válido')
-            }
-          } catch (fourthError) {
-            // Si todo falla, loggear el error y la respuesta para debugging
-            console.error('❌ No se pudo parsear el JSON después de múltiples intentos')
-            console.error(`   Error original: ${errorMessage}`)
-            console.error(`   Posición del error: ${errorMessage.includes('position') ? errorMessage.match(/position (\d+)/)?.[1] : 'desconocida'}`)
-            
-            // Mostrar contexto alrededor de la posición del error si está disponible
-            const positionMatch = errorMessage.match(/position (\d+)/)
-            if (positionMatch) {
-              const errorPos = parseInt(positionMatch[1])
-              const start = Math.max(0, errorPos - 200)
-              const end = Math.min(response.length, errorPos + 200)
-              console.error(`   Contexto alrededor del error (pos ${errorPos}):`)
-              console.error(`   ...${response.substring(start, end)}...`)
-            } else {
-              console.error(`   Respuesta recibida (primeros 500 chars): ${response.substring(0, 500)}`)
-              console.error(`   Respuesta recibida (últimos 500 chars): ${response.substring(Math.max(0, response.length - 500))}`)
-            }
-            console.error(`   Longitud total: ${response.length} caracteres`)
-            throw new Error(`Failed to parse JSON response: ${errorMessage}`)
-          }
-        }
-      }
-    }
-    
-    // PRIMERO: Si hay nombres proporcionados, sobrescribirlos ANTES de hacer el matching
-    if (parsedCase.suspects && playerNames && playerNames.length > 0) {
-      console.log('🔧 Applying provided player names to suspects...')
-      parsedCase.suspects = parsedCase.suspects.map((suspect: any, index: number) => {
-        // Asegurar que name sea un string válido
-        let name: string = suspect.name
-        if (typeof name === 'object' && name !== null) {
-          name = (name as any).toString() || String(name)
-          console.warn(`⚠️ Suspect ${index + 1} name was an object, converted to: "${name}"`)
-        } else if (typeof name !== 'string') {
-          name = String(name || '')
-        }
-        
-        // Si hay un nombre proporcionado para este índice, usarlo
-        if (playerNames[index]) {
-          name = playerNames[index]
-          console.log(`✅ Applied provided name for suspect-${index + 1}: "${name}"`)
-        }
-        
-        return { ...suspect, name: name }
+    // ===============================
+    // VALIDACIÓN DURA ANTES DEL PARSE
+    // ===============================
+    const trimmed = response.trim()
+
+    if (!trimmed.endsWith('}')) {
+      return res.status(502).json({
+        error: 'AI_GENERATION_FAILED',
+        details: 'Model returned incomplete JSON (not closed)',
       })
     }
 
-    // Asignar URLs reales de Supabase a los sospechosos
+    const quoteCount = (trimmed.match(/"/g) || []).length
+    if (quoteCount % 2 !== 0) {
+      return res.status(502).json({
+        error: 'AI_GENERATION_FAILED',
+        details: 'Model returned malformed JSON (unbalanced quotes)',
+      })
+    }
+
+    let parsedCase: InitialCaseResponse
+    try {
+      parsedCase = JSON.parse(trimmed)
+      console.log('✅ JSON parsed successfully')
+    } catch (err) {
+      console.error('❌ JSON.parse failed despite validation')
+      return res.status(502).json({
+        error: 'AI_GENERATION_FAILED',
+        details: 'Model returned invalid JSON',
+      })
+    }
+
+    // Aplicar nombres de jugadores
+    if (parsedCase.suspects && playerNames.length > 0) {
+      parsedCase.suspects = parsedCase.suspects.map((s: any, i: number) => ({
+        ...s,
+        name: playerNames[i] || String(s.name || ''),
+      }))
+    }
+
+    // Matching con Supabase
     if (parsedCase.suspects && selectedSuspects) {
       console.log('🔧 Matching suspects to Supabase photos...')
-      
+
       const remaining = [...selectedSuspects]
       const usedIds = new Set<string>()
 
       function scoreMatch(gen: any, orig: any): number {
         let score = 0
-        const genRole = (gen.role || '').toString().toLowerCase().trim()
-        const origOccEs = (orig.occupation?.es || orig.occupation || '').toString().toLowerCase().trim()
-        const origOccEn = (orig.occupation?.en || '').toString().toLowerCase().trim()
-        
+        const genRole = (gen.role || '').toLowerCase()
+        const origOccEs = (orig.occupation?.es || '').toLowerCase()
+        const origOccEn = (orig.occupation?.en || '').toLowerCase()
+
         if (genRole && (genRole === origOccEs || genRole === origOccEn)) score += 5
-        else if (genRole && (origOccEs.includes(genRole) || genRole.includes(origOccEs))) score += 3
+        else if (genRole && origOccEs.includes(genRole)) score += 3
 
         if (gen.gender && orig.gender && gen.gender === orig.gender) score += 2
-
-        if (typeof gen.age === 'number' && typeof orig.approx_age === 'number') {
-          const diff = Math.abs(gen.age - orig.approx_age)
-          if (diff <= 1) score += 2
-          else if (diff <= 3) score += 1
-        }
-
         return score
       }
 
-      parsedCase.suspects = parsedCase.suspects.map((gen) => {
-        // Asegurar que name sea un string (ya lo aplicamos antes, pero por si acaso)
-        let name: string = gen.name
-        if (typeof name === 'object' && name !== null) {
-          name = (name as any).toString() || String(name)
-        } else if (typeof name !== 'string') {
-          name = String(name || '')
-        }
-        
+      parsedCase.suspects = parsedCase.suspects.map((gen: any) => {
         let best = null as any
         let bestScore = -1
-        
+
         remaining.forEach((orig) => {
           if (usedIds.has(orig.id)) return
           const s = scoreMatch(gen, orig)
@@ -322,52 +259,23 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
           }
         })
 
-        if (!best) {
-          best = remaining.find((o) => !usedIds.has(o.id))
-        }
-
         if (best?.id) usedIds.add(best.id)
 
-        const updatedSuspect = { 
-          ...gen, 
-          name: name, // Asegurar que name sea siempre un string
-          photo: best?.image_url || gen.photo 
+        if (best?.image_url) {
+          console.log(`✅ Matched "${gen.name}" → ${best.occupation?.es}`)
         }
 
-        if (best?.image_url) {
-          console.log(`✅ Matched "${name}" → ${best.occupation?.es}`)
+        return {
+          ...gen,
+          photo: best?.image_url || gen.photo,
         }
-        
-        return updatedSuspect
-      })
-    } else if (parsedCase.suspects) {
-      // Aunque no haya selectedSuspects, asegurar que los nombres sean strings
-      parsedCase.suspects = parsedCase.suspects.map((gen: any, index: number) => {
-        let name: string = gen.name
-        if (typeof name === 'object' && name !== null) {
-          name = (name as any).toString() || String(name)
-          console.warn(`⚠️ Suspect ${index + 1} name was an object, converted to: "${name}"`)
-        } else if (typeof name !== 'string') {
-          name = String(name || '')
-        }
-        
-        // Si hay nombres proporcionados por el usuario, usar esos
-        if (playerNames && playerNames.length > index && playerNames[index]) {
-          name = playerNames[index]
-          console.log(`✅ Applied provided name for suspect-${index + 1}: "${name}"`)
-        }
-        
-        return { ...gen, name: name }
       })
     }
 
-    // Preservar URL del arma
     if (selectedWeapon && parsedCase.weapon) {
-      console.log(`✅ Assigning weapon photo: ${selectedWeapon.image_url}`)
       parsedCase.weapon.photo = selectedWeapon.image_url
     }
 
-    // Agregar información de configuración
     parsedCase.config = {
       caseType: body.caseType,
       totalClues: body.clues,
@@ -375,29 +283,21 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       difficulty: body.difficulty,
     }
 
-    // NO incluir supabaseSuspects en la respuesta (optimización de tamaño)
-    // parsedCase.supabaseSuspects = selectedSuspects
-
     console.log('✅ Initial case generated successfully')
     console.log(`   Guilty: ${parsedCase.hiddenContext.guiltyId}`)
-    console.log(`   Suspects: ${parsedCase.suspects.length}`)
 
-    // NO generamos la ronda 1 aquí - se generará mientras el usuario lee el intro
-    
     return res.json(parsedCase)
-    
   } catch (error) {
     console.error('Error in generate-initial-case API:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
-    return res.status(500).json(
-      { 
-        error: 'Failed to generate initial case',
-        details: errorMessage,
-      }
-    )
+    const message = error instanceof Error ? error.message : 'Unknown error'
+
+    return res.status(500).json({
+      error: 'Failed to generate initial case',
+      details: message,
+    })
   }
 })
+
 
 /**
  * Intenta reparar strings no terminados en JSON
@@ -708,5 +608,20 @@ ${playerGenders.length > 0 ? `- 🚨 **GÉNEROS OBLIGATORIOS - DEBES USAR EXACTA
 - El JSON debe ser válido, sin errores
 - Todos los strings en una sola línea
 - **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
+
+
+🚨 REGLAS CRÍTICAS DE FORMATO (OBLIGATORIAS):
+1. Responde EXCLUSIVAMENTE con un objeto JSON válido.
+2. NO incluyas texto fuera del JSON (nada de explicaciones, markdown o comentarios).
+3. NO generes textocifrado, tokens, hashes, JWTs, Base64, IDs largos ni secuencias sin espacios.
+4. Usa solo lenguaje narrativo humano y natural.
+5. Evita cadenas largas sin espacios o con muchos símbolos.
+6. Todos los strings DEBEN:
+   - empezar y terminar con comillas normales (")
+   - NO contener saltos de línea no escapados
+7. NO inventes documentos, archivos, registros técnicos, logs, códigos ni datos serializados.
+8. Si no estás seguro de un valor, usa un string corto y simple.
+9. El JSON DEBE cerrarse correctamente (llaves y corchetes balanceados).
+
 `
 }
