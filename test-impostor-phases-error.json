@@ -1,0 +1,7 @@
+{
+  "error": "Server responded with error",
+  "details": {
+    "error": "Failed to generate impostor phases",
+    "details": "Could not determine killer playerId. randomKillerIndex: 3, allPlayerIds.length: 10, killerPlayerId: generated-player-3, killerPlayer.playerId: undefined"
+  }
+}

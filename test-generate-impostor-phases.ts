@@ -1,219 +1,327 @@
-/**
- * Script de prueba para verificar que el endpoint de generar caso impostor con fases funciona
- * 
- * Uso:
- *   npx tsx test-generate-impostor-phases.ts
- * 
- * NOTA: Este test requiere:
- * - Un roomId válido en Supabase con jugadores
- * - Variables de entorno configuradas (.env)
- */
-
 import dotenv from 'dotenv'
+import * as fs from 'fs/promises'
 
-// Cargar .env.local primero (si existe), luego .env
+// Cargar variables de entorno
 dotenv.config({ path: '.env.local' })
-dotenv.config() // .env tiene prioridad sobre .env.local
+dotenv.config()
 
-// Usar el mismo puerto que el servidor
 const SERVER_PORT = process.env.PORT || 3001
 const API_URL = process.env.API_URL || `http://localhost:${SERVER_PORT}`
 const ENDPOINT = `${API_URL}/api/generate-impostor-phases`
 
+// ID de sala de prueba (debe existir en Supabase con jugadores)
+// IMPORTANTE: Cambiar por un roomId real de tu base de datos
+const testRoomId = process.env.TEST_ROOM_ID || 'test-room-id'
+
+// Si quieres forzar un número específico de sospechosos, úsalo aquí
+// Si es null, usará el número real de jugadores en la sala
+const FORCE_SUSPECTS_COUNT = process.env.FORCE_SUSPECTS_COUNT ? parseInt(process.env.FORCE_SUSPECTS_COUNT) : null
+
+// Health check
 async function checkServerHealth() {
-  // Intentar primero con el puerto configurado, luego 3000, luego 3001
-  const portsToTry = [SERVER_PORT, 3000, 3001].filter((port, index, self) => self.indexOf(port) === index)
-  
+  const portsToTry = [SERVER_PORT, 3000, 3001].filter(
+    (port, index, self) => self.indexOf(port) === index
+  )
+
   for (const port of portsToTry) {
     try {
-      const testUrl = `http://localhost:${port}/api/health`
-      const healthResponse = await fetch(testUrl)
-      if (healthResponse.ok) {
-        if (port !== SERVER_PORT) {
-          console.log(`⚠️  Servidor encontrado en puerto ${port} (configurado: ${SERVER_PORT})`)
-          return { running: true, port }
-        }
-        console.log('✅ Servidor está corriendo\n')
+      const res = await fetch(`http://localhost:${port}/api/health`)
+      if (res.ok) {
+        console.log(`✅ Servidor activo en puerto ${port}`)
         return { running: true, port }
       }
-    } catch (error) {
-      // Continuar al siguiente puerto
+    } catch {
       continue
     }
   }
+
   return { running: false, port: null }
 }
 
-async function testGenerateImpostorPhases() {
-  console.log('🧪 Iniciando test de generación de caso impostor con fases...\n')
-
-  // Verificar que el servidor esté corriendo
-  console.log('🔍 Verificando que el servidor esté corriendo...')
-  const serverStatus = await checkServerHealth()
-  
-  if (!serverStatus.running) {
-    console.error('❌ El servidor no está corriendo o no responde\n')
-    console.log('💡 Para iniciar el servidor, ejecuta en otra terminal:')
-    console.log('   npm run dev\n')
-    console.log('📋 Asegúrate de tener configuradas las variables de entorno en .env:')
-    console.log('   - OPENAI_API_KEY (requerido)')
-    console.log('   - NEXT_PUBLIC_SUPABASE_URL (requerido)')
-    console.log('   - NEXT_PUBLIC_SUPABASE_ANON_KEY (requerido)')
-    console.log('   - PORT (opcional, default: 3001)')
-    process.exit(1)
-  }
-
-  // Usar el puerto donde encontramos el servidor
-  const actualPort = serverStatus.port || SERVER_PORT
-  const actualApiUrl = `http://localhost:${actualPort}`
-  const actualEndpoint = `${actualApiUrl}/api/generate-impostor-phases`
-  
-  console.log(`📍 Endpoint: ${actualEndpoint}\n`)
-
-  // NOTA: Necesitas un roomId válido con jugadores en Supabase
-  // Por ahora usamos un roomId de ejemplo - deberás reemplazarlo con uno real
-  const testRoomId = process.env.TEST_ROOM_ID || 'test-room-id'
-  
-  if (testRoomId === 'test-room-id') {
-    console.log('⚠️  Usando roomId de prueba. Si falla, configura TEST_ROOM_ID en .env con un roomId válido\n')
-  }
-
-  // Datos de prueba
-  const testData = {
-    roomId: testRoomId,
-    caseType: 'asesinato',
-    suspects: 4,
-    clues: 8,
-    scenario: 'hotel',
-    difficulty: 'normal',
-    style: 'realistic' as const,
-    language: 'en'
-  }
-
-  console.log('📤 Enviando petición con los siguientes datos:')
-  console.log(JSON.stringify(testData, null, 2))
-  console.log('\n')
-
+// Función para obtener jugadores de la sala desde Supabase
+async function getRoomPlayersCount(roomId: string): Promise<number> {
   try {
-    const startTime = Date.now()
+    const { createClient } = await import('@supabase/supabase-js')
     
-    const response = await fetch(actualEndpoint, {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('⚠️  No se encontraron credenciales de Supabase, no se puede obtener número de jugadores')
+      return 0
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseKey)
+    
+    const { data, error } = await supabase
+      .from('players')
+      .select('id')
+      .eq('room_id', roomId)
+    
+    if (error) {
+      console.warn(`⚠️  No se pudo obtener jugadores de la sala: ${error.message}`)
+      return 0
+    }
+    
+    return data?.length || 0
+  } catch (error) {
+    console.warn('⚠️  No se pudo obtener número de jugadores:', error instanceof Error ? error.message : 'Unknown error')
+    return 0
+  }
+}
+
+async function testGenerateImpostorPhases() {
+  // Declarar testData fuera del try para que esté disponible en el catch
+  let testData: any = null
+  
+  try {
+    console.log('\n🧪 TEST → generate-impostor-phases\n')
+
+    // Health check
+    const health = await checkServerHealth()
+    if (!health.running) {
+      console.error('❌ Servidor no está corriendo. Por favor inicia el servidor primero.')
+      process.exit(1)
+    }
+
+    // Determinar número de sospechosos
+    let suspectsCount = FORCE_SUSPECTS_COUNT
+    
+    if (!suspectsCount) {
+      // Si no se fuerza un número, obtenerlo de la sala
+      console.log(`📋 Obteniendo jugadores de la sala ${testRoomId}...`)
+      const roomPlayersCount = await getRoomPlayersCount(testRoomId)
+      
+      if (roomPlayersCount === 0) {
+        console.warn(`⚠️  No se encontraron jugadores en la sala ${testRoomId}`)
+        console.warn(`   El endpoint puede funcionar igual, generará nombres para los jugadores`)
+        console.warn(`   Para probar la solución multi-step, usa: FORCE_SUSPECTS_COUNT=10`)
+        console.log(`\n📋 Usando 10 sospechosos por defecto para probar la solución multi-step...`)
+        suspectsCount = 10
+      } else {
+        suspectsCount = roomPlayersCount
+        console.log(`✅ Se encontraron ${suspectsCount} jugadores en la sala`)
+        console.log(`📋 Usando ${suspectsCount} sospechosos (número de jugadores en la sala)`)
+        console.log(`💡 Tip: Si quieres probar con más sospechosos, usa FORCE_SUSPECTS_COUNT=10 en .env`)
+      }
+    } else {
+      console.log(`📋 Número de sospechosos forzado: ${suspectsCount}`)
+      console.log(`⚠️  Nota: Si hay menos jugadores en la sala, el endpoint generará nombres para los adicionales`)
+    }
+
+    testData = {
+      roomId: testRoomId,
+      caseType: 'asesinato',
+      suspects: suspectsCount,
+      clues: 8,
+      scenario: 'hotel',
+      difficulty: 'normal',
+      style: 'realistic' as const,
+      language: 'es' // Español
+    }
+
+    console.log('🧪 Testing generate-impostor-phases endpoint...')
+    console.log(`📋 Test data:`, JSON.stringify(testData, null, 2))
+    console.log(`\n📡 Sending request to ${ENDPOINT}...`)
+
+    const startTime = Date.now()
+    const response = await fetch(ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(testData)
+      body: JSON.stringify(testData),
     })
 
     const endTime = Date.now()
-    const duration = endTime - startTime
+    const duration = (endTime - startTime) / 1000
 
-    console.log(`⏱️  Tiempo de respuesta: ${duration}ms`)
-    console.log(`📊 Status: ${response.status} ${response.statusText}\n`)
+    console.log(`\n⏱️  Request completed in ${duration.toFixed(2)}s`)
+    console.log(`📊 Status: ${response.status} ${response.statusText}`)
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      console.error('❌ Error en la respuesta:')
-      console.error(JSON.stringify(errorData, null, 2))
-      
-      if (errorData.error?.includes('No players found')) {
-        console.log('\n💡 El roomId no tiene jugadores. Asegúrate de:')
-        console.log('   1. Crear una sala en Supabase')
-        console.log('   2. Agregar jugadores a esa sala')
-        console.log('   3. Usar el roomId correcto en TEST_ROOM_ID')
-      }
-      
-      process.exit(1)
+    let data: any
+    try {
+      data = await response.json()
+    } catch (jsonError) {
+      // Si falla el parse, guardar la respuesta raw
+      const textData = await response.text()
+      await fs.writeFile(
+        'test-impostor-phases-response-raw.txt',
+        textData,
+        'utf-8'
+      )
+      console.error('❌ Error parsing JSON response')
+      console.error('💾 Raw response saved to test-impostor-phases-response-raw.txt')
+      throw jsonError
     }
 
-    const data = await response.json()
-
-    console.log('✅ Respuesta exitosa!\n')
-    console.log('📋 Resumen del caso impostor con fases generado:')
-    console.log(`   Título: ${data.caseTitle}`)
-    console.log(`   Tipo: ${data.config?.caseType}`)
-    console.log(`   Escenario: ${data.config?.scenario}`)
-    console.log(`   Dificultad: ${data.config?.difficulty}`)
-    console.log(`   Víctima: ${data.victim.name} (${data.victim.role})`)
-    console.log(`   Jugadores: ${data.players.length}`)
-    console.log(`   Arma: ${data.weapon?.name || 'N/A'}`)
-    console.log(`   Asesino (oculto): ${data.hiddenContext.killerId}\n`)
-
-    console.log('👥 Jugadores con fases:')
-    data.players.forEach((player: any, index: number) => {
-      const isKiller = player.phase4?.isKiller === true
-      console.log(`\n   ${index + 1}. ${player.phase1?.name || 'Sin nombre'}`)
-      console.log(`      - PlayerId: ${player.playerId}`)
-      console.log(`      - Ocupación: ${player.phase1?.occupation || 'N/A'}`)
-      console.log(`      - Relación con víctima: ${player.phase1?.relationshipWithVictim || 'N/A'}`)
-      console.log(`      - Observaciones (Fase 2): ${player.phase2?.observations?.length || 0}`)
-      console.log(`      - Timeline (Fase 3): ${player.phase3?.timeline?.length || 0} momentos`)
-      console.log(`      - Motivo de sospecha: ${player.phase4?.whySuspicious?.substring(0, 60) || 'N/A'}...`)
-      console.log(`      - ${isKiller ? '🔴 [ASESINO]' : '✅ Inocente'}`)
-    })
-    
-    // Verificar que hay exactamente un asesino
-    const killers = data.players.filter((p: any) => p.phase4?.isKiller === true)
-    console.log('\n🔍 Verificación del asesino:')
-    if (killers.length === 1) {
-      console.log(`   ✅ Hay exactamente un asesino: ${killers[0].phase1?.name} (${killers[0].playerId})`)
-      if (killers[0].playerId === data.hiddenContext.killerId) {
-        console.log(`   ✅ El playerId del asesino coincide con hiddenContext.killerId`)
-      } else {
-        console.log(`   ⚠️  El playerId del asesino (${killers[0].playerId}) no coincide con hiddenContext.killerId (${data.hiddenContext.killerId})`)
-      }
-    } else {
-      console.log(`   ❌ Error: Se esperaba 1 asesino, pero se encontraron ${killers.length}`)
-    }
-
-    // Verificar estructura de fases
-    console.log('\n🔍 Verificación de estructura de fases:')
-    let allPhasesValid = true
-    data.players.forEach((player: any, index: number) => {
-      if (!player.phase1 || !player.phase2 || !player.phase3 || !player.phase4) {
-        console.log(`   ❌ Jugador ${index + 1} (${player.phase1?.name}): Faltan fases`)
-        allPhasesValid = false
-      } else {
-        console.log(`   ✅ Jugador ${index + 1} (${player.phase1.name}): Todas las fases presentes`)
-      }
-    })
-
-    if (allPhasesValid) {
-      console.log('\n✅ Todas las fases están correctamente estructuradas!')
-    }
-
-    console.log('\n✅ Test completado exitosamente!')
-    
-    // Guardar respuesta completa en un archivo para inspección
-    const fs = await import('fs/promises')
+    // Always save the raw response for inspection
     await fs.writeFile(
       'test-impostor-phases-response.json',
       JSON.stringify(data, null, 2),
       'utf-8'
     )
-    console.log('💾 Respuesta completa guardada en test-impostor-phases-response.json')
+    console.log('\n💾 Raw response saved to test-impostor-phases-response.json')
+
+    if (!response.ok) {
+      console.error('❌ Error en respuesta')
+      console.error(JSON.stringify(data, null, 2))
+      await fs.writeFile(
+        'test-impostor-phases-error.json',
+        JSON.stringify({ error: 'Server responded with error', details: data }, null, 2),
+        'utf-8'
+      )
+      process.exit(1)
+    }
+
+    // Validaciones
+    console.log('\n✅ Validating response...')
+
+    // 1. Validar estructura básica
+    if (!data.caseTitle) {
+      throw new Error('Missing caseTitle')
+    }
+    console.log(`   ✅ caseTitle: "${data.caseTitle}"`)
+
+    if (!data.caseDescription) {
+      throw new Error('Missing caseDescription')
+    }
+    console.log(`   ✅ caseDescription: "${data.caseDescription.substring(0, 50)}..."`)
+
+    // 2. Validar víctima
+    if (!data.victim || !data.victim.name) {
+      throw new Error('Missing victim')
+    }
+    console.log(`   ✅ Victim: ${data.victim.name}`)
+
+    // 3. Validar jugadores
+    if (!data.players || !Array.isArray(data.players)) {
+      throw new Error('Missing players array')
+    }
+
+    // Validar que el número de jugadores coincida (puede ser diferente si hay menos en la sala)
+    if (data.players.length !== testData.suspects) {
+      console.warn(`   ⚠️  Warning: Expected ${testData.suspects} players, got ${data.players.length}`)
+      console.warn(`   ℹ️  This is OK if there are fewer players in the room than requested`)
+    } else {
+      console.log(`   ✅ Players: ${data.players.length} (expected ${testData.suspects})`)
+    }
+
+    // 4. Validar que cada jugador tenga las 4 fases
+    data.players.forEach((player: any, index: number) => {
+      if (!player.phase1) {
+        throw new Error(`Player ${index + 1} missing phase1`)
+      }
+      if (!player.phase1.name) {
+        throw new Error(`Player ${index + 1} missing phase1.name`)
+      }
+      if (!player.phase1.occupation) {
+        throw new Error(`Player ${index + 1} missing phase1.occupation`)
+      }
+
+      if (!player.phase2) {
+        throw new Error(`Player ${index + 1} missing phase2`)
+      }
+      if (!player.phase2.observations || !Array.isArray(player.phase2.observations)) {
+        throw new Error(`Player ${index + 1} missing phase2.observations`)
+      }
+
+      if (!player.phase3) {
+        throw new Error(`Player ${index + 1} missing phase3`)
+      }
+      if (!player.phase3.timeline || !Array.isArray(player.phase3.timeline)) {
+        throw new Error(`Player ${index + 1} missing phase3.timeline`)
+      }
+
+      if (!player.phase4) {
+        throw new Error(`Player ${index + 1} missing phase4`)
+      }
+      if (typeof player.phase4.isKiller !== 'boolean') {
+        throw new Error(`Player ${index + 1} missing phase4.isKiller`)
+      }
+      if (!player.phase4.whySuspicious) {
+        throw new Error(`Player ${index + 1} missing phase4.whySuspicious`)
+      }
+      if (!player.phase4.alibi) {
+        throw new Error(`Player ${index + 1} missing phase4.alibi`)
+      }
+    })
+    console.log(`   ✅ All ${data.players.length} players have all 4 phases`)
+
+    // 5. Validar que haya exactamente un asesino
+    const killers = data.players.filter((p: any) => p.phase4.isKiller === true)
+    if (killers.length !== 1) {
+      throw new Error(`Expected 1 killer, got ${killers.length}`)
+    }
+    console.log(`   ✅ Exactly one killer: ${killers[0].phase1?.name} (${killers[0].playerId})`)
+
+    // 6. Validar hiddenContext
+    if (!data.hiddenContext || !data.hiddenContext.killerId) {
+      throw new Error('Missing hiddenContext.killerId')
+    }
+    console.log(`   ✅ HiddenContext.killerId: ${data.hiddenContext.killerId}`)
+
+    // Verificar que el killerId coincida
+    if (killers[0].playerId !== data.hiddenContext.killerId) {
+      console.warn(`   ⚠️  Warning: killer playerId (${killers[0].playerId}) doesn't match hiddenContext.killerId (${data.hiddenContext.killerId})`)
+    } else {
+      console.log(`   ✅ Killer playerId matches hiddenContext.killerId`)
+    }
+
+    // 7. Validar arma (si es asesinato)
+    if (testData.caseType === 'asesinato') {
+      if (!data.weapon) {
+        throw new Error('Missing weapon for murder case')
+      }
+      console.log(`   ✅ Weapon: ${data.weapon.name}`)
+    }
+
+    // 8. Validar config
+    if (!data.config) {
+      throw new Error('Missing config')
+    }
+    console.log(`   ✅ Config: ${JSON.stringify(data.config)}`)
+
+    // Resumen
+    console.log('\n' + '='.repeat(60))
+    console.log('✅ ALL VALIDATIONS PASSED!')
+    console.log('='.repeat(60))
+    console.log(`\n📊 Summary:`)
+    console.log(`   - Case: "${data.caseTitle}"`)
+    console.log(`   - Players: ${data.players.length}`)
+    console.log(`   - Killer: ${killers[0].phase1?.name} (${killers[0].playerId})`)
+    console.log(`   - Victim: ${data.victim.name}`)
+    console.log(`   - Duration: ${duration.toFixed(2)}s`)
+    console.log(`\n💾 Full response saved to: test-impostor-phases-response.json`)
 
   } catch (error) {
-    console.error('❌ Error al ejecutar el test:')
+    console.error('\n❌ Test failed:', error)
     if (error instanceof Error) {
-      console.error(`   ${error.message}`)
-      if (error.cause) {
-        console.error(`   Causa: ${error.cause}`)
-      }
-    } else {
-      console.error(error)
+      console.error(`   Error message: ${error.message}`)
     }
     
-    console.log('\n💡 Asegúrate de que:')
-    console.log('   1. El servidor esté corriendo (npm run dev)')
-    console.log('   2. Las variables de entorno estén configuradas (.env)')
-    console.log('   3. El roomId tenga jugadores en Supabase')
-    console.log('   4. El puerto sea el correcto (default: 3001)')
+    // Guardar información del error también
+    try {
+      await fs.writeFile(
+        'test-impostor-phases-error.json',
+        JSON.stringify({
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+          testData: testData || null,
+        }, null, 2),
+        'utf-8'
+      )
+      console.log('💾 Error details saved to test-impostor-phases-error.json')
+    } catch (writeError) {
+      // Ignorar errores al escribir el archivo de error
+    }
     
     process.exit(1)
   }
 }
 
-// Ejecutar el test
-testGenerateImpostorPhases()
-
+// Ejecutar test
+testGenerateImpostorPhases().catch((error) => {
+  console.error('❌ Test execution failed:', error)
+  process.exit(1)
+})
