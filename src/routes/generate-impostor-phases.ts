@@ -833,16 +833,23 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     // Seleccionar asesino aleatorio
     const randomKillerIndex = Math.floor(Math.random() * body.suspects)
     
-    // Generar playerIds para todos los jugadores (reales + generados)
-    // Si hay más jugadores solicitados que reales, generar IDs para los adicionales
+    // Generar playerIds, nombres y géneros para todos los jugadores (reales + generados)
+    // Si hay más jugadores solicitados que reales, generar valores para los adicionales
     const allPlayerIds: string[] = []
+    const allPlayerNames: string[] = []
+    const allPlayerGenders: string[] = []
+    
     for (let i = 0; i < body.suspects; i++) {
       if (i < playerIds.length) {
-        // Usar ID real de la sala
+        // Usar valores reales de la sala
         allPlayerIds.push(playerIds[i])
+        allPlayerNames.push(playerNames[i])
+        allPlayerGenders.push(playerGenders[i])
       } else {
-        // Generar ID para jugador adicional
+        // Generar valores para jugador adicional
         allPlayerIds.push(`generated-player-${i}`)
+        allPlayerNames.push(`Jugador ${i + 1}`) // Nombre genérico que será reemplazado por la IA
+        allPlayerGenders.push('unknown')
       }
     }
     
@@ -866,7 +873,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       selectedWeapon,
       language,
       discoveredByPlayerIndex,
-      playerNames
+      allPlayerNames // Usar allPlayerNames en lugar de playerNames
     )
     console.log('✅ Paso 1 completado: Core del caso generado')
 
@@ -882,9 +889,9 @@ export async function generateImpostorPhases(req: Request, res: Response) {
         selectedSuspects,
         language,
         randomKillerIndex,
-        playerNames,
-        playerGenders,
-        playerIds,
+        allPlayerNames, // Usar allPlayerNames en lugar de playerNames
+        allPlayerGenders, // Usar allPlayerGenders en lugar de playerGenders
+        allPlayerIds, // Usar allPlayerIds en lugar de playerIds
         discoveredByPlayerIndex,
         allPlayers, // Pasar jugadores anteriores como contexto
         batchStart,
@@ -951,8 +958,8 @@ export async function generateImpostorPhases(req: Request, res: Response) {
               player.playerId = allPlayerIds[index]
               console.warn(`⚠️ PlayerId ${allPlayerIds[index]} was already used, but assigning it anyway to "${player.phase1?.name}"`)
             }
-          }
-        } else {
+        }
+      } else {
           // Si hay más jugadores que IDs, generar uno
           const fallbackId = `generated-player-${index}`
           player.playerId = fallbackId
@@ -1082,10 +1089,10 @@ export async function generateImpostorPhases(req: Request, res: Response) {
         killerId: finalKillerId, // Asegurar que siempre tenga un valor
       },
       config: {
-        caseType: body.caseType,
-        totalClues: body.clues,
-        scenario: body.scenario,
-        difficulty: body.difficulty,
+      caseType: body.caseType,
+      totalClues: body.clues,
+      scenario: body.scenario,
+      difficulty: body.difficulty,
       },
     }
     
