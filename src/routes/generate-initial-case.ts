@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { SuspectService } from '../services/suspect-service.js'
 import { WeaponService } from '../services/weapon-service.js'
+import { getSupabase } from '../services/supabase.js'
 import OpenAI from 'openai'
 
 // Lazy initialization - solo crea el cliente cuando se necesite
@@ -38,6 +39,7 @@ export interface InitialCaseGenerationRequest {
 }
 
 export interface InitialCaseResponse {
+  id?: string
   caseTitle: string
   caseDescription: string
   victim: {
@@ -94,9 +96,600 @@ export interface InitialCaseResponse {
   }
 }
 
+/**
+ * Intenta reparar strings no terminados en JSON
+ */
+function fixUnterminatedStrings(jsonString: string): string {
+  let result = jsonString
+  let inString = false
+  let escapeNext = false
+  let stringStart = -1
+  const stack: number[] = []
+  
+  for (let i = 0; i < result.length; i++) {
+    const char = result[i]
+    
+    if (escapeNext) {
+      escapeNext = false
+      continue
+    }
+    
+    if (char === '\\') {
+      escapeNext = true
+      continue
+    }
+    
+    if (char === '"') {
+      if (inString) {
+        inString = false
+        if (stack.length > 0) {
+          stack.pop()
+        }
+      } else {
+        inString = true
+        stringStart = i
+        stack.push(i)
+      }
+    }
+  }
+  
+  if (inString && stringStart >= 0) {
+    const lastBrace = result.lastIndexOf('}')
+    const lastBracket = result.lastIndexOf(']')
+    const lastValidPos = Math.max(lastBrace, lastBracket, 0)
+    
+    if (stringStart < lastValidPos) {
+      let insertPos = stringStart + 1
+      let foundInsertPos = false
+      
+      while (insertPos < result.length && insertPos <= lastValidPos) {
+        const char = result[insertPos]
+        if (char === ',' || char === '}' || char === ']') {
+          let isEscaped = false
+          let checkPos = insertPos - 1
+          let backslashCount = 0
+          while (checkPos >= stringStart && result[checkPos] === '\\') {
+            backslashCount++
+            checkPos--
+          }
+          isEscaped = backslashCount % 2 === 1
+          
+          if (!isEscaped) {
+            result = result.slice(0, insertPos) + '"' + result.slice(insertPos)
+            foundInsertPos = true
+            break
+          }
+        }
+        insertPos++
+      }
+      
+      if (!foundInsertPos && lastValidPos > stringStart) {
+        result = result.slice(0, lastValidPos) + '"' + result.slice(lastValidPos)
+      }
+    } else {
+      result = result + '"'
+    }
+  }
+  
+  return result
+}
+
+/**
+ * Reparar y parsear JSON con validación
+ */
+function parseAndRepairJSON(response: string): any {
+  let trimmed = response.trim()
+  
+  if (!trimmed.endsWith('}')) {
+    console.warn('⚠️  JSON no termina con }, intentando reparar...')
+    
+    const lastBrace = trimmed.lastIndexOf('}')
+    if (lastBrace > 0) {
+      const beforeLastBrace = trimmed.substring(0, lastBrace + 1)
+      const quoteCount = (beforeLastBrace.match(/"/g) || []).length
+      if (quoteCount % 2 === 0) {
+        trimmed = beforeLastBrace
+        console.log('✅ Reparado: usando hasta el último } válido')
+      } else {
+        const fixed = fixUnterminatedStrings(beforeLastBrace)
+        trimmed = fixed
+        console.log('✅ Reparado: strings balanceados y JSON cerrado')
+      }
+    } else {
+      let openBraces = 0
+      let openBrackets = 0
+      let lastValidPos = trimmed.length
+      
+      for (let i = trimmed.length - 1; i >= 0; i--) {
+        const char = trimmed[i]
+        if (char === '}') openBraces++
+        else if (char === '{') openBraces--
+        else if (char === ']') openBrackets++
+        else if (char === '[') openBrackets--
+        
+        if (openBraces < 0 || openBrackets < 0) {
+          lastValidPos = i + 1
+          break
+        }
+      }
+      
+      let closing = ''
+      if (openBraces > 0) closing += '}'.repeat(openBraces)
+      if (openBrackets > 0) closing += ']'.repeat(openBrackets)
+      
+      trimmed = trimmed.substring(0, lastValidPos) + closing
+      console.log(`✅ Reparado: agregado ${closing.length} caracteres de cierre`)
+    }
+    
+    if (!trimmed.endsWith('}')) {
+      throw new Error('Model returned incomplete JSON (not closed, could not repair)')
+    }
+  }
+  
+  const quoteCount = (trimmed.match(/"/g) || []).length
+  if (quoteCount % 2 !== 0) {
+    console.warn('⚠️  Unbalanced quotes detected, attempting to fix...')
+    const fixed = fixUnterminatedStrings(trimmed)
+    const fixedQuoteCount = (fixed.match(/"/g) || []).length
+    if (fixedQuoteCount % 2 === 0) {
+      console.log('✅ Fixed unbalanced quotes')
+      trimmed = fixed
+    } else {
+      throw new Error('Model returned malformed JSON (unbalanced quotes, could not fix)')
+    }
+  }
+  
+  try {
+    return JSON.parse(trimmed)
+  } catch (err) {
+    console.error('❌ JSON.parse failed, attempting to fix...')
+    try {
+      const fixed = fixUnterminatedStrings(trimmed)
+      return JSON.parse(fixed)
+    } catch (fixErr) {
+      console.error(`   Response length: ${trimmed.length} characters`)
+      console.error(`   Last 500 chars: ${trimmed.slice(-500)}`)
+      throw new Error(
+        `Model returned invalid JSON that could not be repaired. ` +
+        `Original: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
+  }
+}
+
+/**
+ * PASO 1: Generar core del caso (caseTitle, caseDescription, victim, weapon)
+ */
+async function generateCaseCore(
+  request: InitialCaseGenerationRequest,
+  selectedSuspects: any[],
+  selectedWeapon: any,
+  language: string
+): Promise<{ caseTitle: string; caseDescription: string; victim: any; weapon?: any }> {
+  const openai = getOpenAIClient()
+  
+  const prompt = `
+Genera SOLO el core de un caso de misterio con la siguiente configuración:
+
+**CONFIGURACIÓN:**
+- Tipo de caso: ${request.caseType}
+- Escenario: ${request.scenario}
+- Dificultad: ${request.difficulty}
+- Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
+
+${selectedWeapon ? `**ARMA HOMICIDA:**
+- Nombre: ${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}
+- URL de imagen: ${selectedWeapon.image_url}
+` : ''}
+
+**VÍCTIMA - DETALLES COMPLETOS OBLIGATORIOS:**
+Crea una víctima con TODOS estos campos (NO OMITIR NINGUNO):
+- Nombre, edad, rol/profesión
+- Descripción BREVE de su personalidad (1-2 oraciones máximo)
+${request.caseType === 'asesinato' ? `- **causeOfDeath**: Causa de muerte específica y detallada (relacionada con el arma: ${language === 'es' ? selectedWeapon?.name.es : selectedWeapon?.name.en || 'arma genérica'})` : ''}
+- **timeOfDeath**: Hora de muerte estimada (ej: "Entre las 9:45pm y 10:15pm según la temperatura corporal")
+- **discoveredBy**: Quién encontró el cuerpo CON LA HORA (ej: "[Nombre], [rol/profesión] a las [hora]")
+- **location**: Ubicación exacta y detallada (ej: "En su oficina privada del segundo piso, tirado junto al escritorio")
+- **bodyPosition**: Descripción detallada de la posición del cuerpo (ej: "Boca arriba, brazos extendidos, señales de lucha")
+- **visibleInjuries**: Heridas visibles específicas (ej: "Tres heridas de arma blanca en el pecho, sangre seca alrededor")
+- **objectsAtScene**: Objetos específicos encontrados en la escena (ej: "Un cuchillo ensangrentado a 2 metros, copa volcada, documentos esparcidos")
+- **signsOfStruggle**: Señales de lucha detalladas (ej: "Silla volcada, lámpara rota, papeles desordenados")
+
+**FORMATO JSON ESPERADO:**
+{
+  "caseTitle": "Título del caso",
+  "caseDescription": "Descripción breve del caso",
+  "victim": {
+    "name": "Nombre",
+    "age": 45,
+    "role": "Profesión",
+    "description": "Descripción breve de personalidad (1-2 oraciones)",
+    ${request.caseType === 'asesinato' ? `"causeOfDeath": "Causa específica",` : ''}
+    "timeOfDeath": "Entre 9:45pm y 10:15pm",
+    "discoveredBy": "Sofía, la sumeller a las 11:00pm",
+    "location": "Ubicación exacta",
+    "bodyPosition": "Descripción de la posición",
+    "visibleInjuries": "Heridas visibles",
+    "objectsAtScene": "Objetos encontrados",
+    "signsOfStruggle": "Señales de lucha"
+  }${selectedWeapon ? `,
+  "weapon": {
+    "id": "weapon-1",
+    "name": "${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}",
+    "description": "Descripción detallada del arma",
+    "location": "Donde se encontró",
+    "photo": "${selectedWeapon.image_url}",
+    "importance": "high"
+  }` : ''}
+}
+
+**RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
+`
+
+  console.log('🤖 Paso 1: Generando core del caso...')
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Crea casos de misterio. Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}. Responde SOLO JSON válido.`,
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 2000,
+    response_format: { type: 'json_object' },
+  })
+
+  const response = completion.choices[0]?.message?.content
+  if (!response) throw new Error('No response from OpenAI')
+
+  console.log('✅ Core generado, parseando...')
+  return parseAndRepairJSON(response)
+}
+
+/**
+ * PASO 2: Generar sospechosos en batches
+ */
+async function generateSuspectsBatch(
+  request: InitialCaseGenerationRequest,
+  selectedSuspects: any[],
+  language: string,
+  randomGuiltyIndex: number,
+  playerNames: string[],
+  playerGenders: string[],
+  existingSuspects: any[],
+  batchStart: number,
+  batchSize: number
+): Promise<any[]> {
+  const openai = getOpenAIClient()
+  
+  const batchEnd = Math.min(batchStart + batchSize, request.suspects)
+  const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i + 1)
+  
+  console.log(`🤖 Paso 2: Generando sospechosos ${batchStart + 1}-${batchEnd} de ${request.suspects}...`)
+  
+  const batchSupabaseSuspects = selectedSuspects.slice(batchStart, batchEnd)
+  
+  const suspectsInfo = batchSupabaseSuspects.map((s, i) => `
+- Suspect ${batchStart + i + 1} (suspect-${batchStart + i + 1}):
+  - Género: ${s.gender}
+  - Edad aproximada: ${s.approx_age}
+  - Ocupación: ${language === 'es' ? s.occupation?.es : s.occupation?.en || s.occupation}
+  - Tags: ${s.tags?.join(', ') || 'sin tags'}
+  - URL de imagen: ${s.image_url}
+`).join('\n')
+
+  const namesInfo = playerNames.length > 0 && batchStart < playerNames.length
+    ? `\n**NOMBRES DE JUGADORES PROPORCIONADOS PARA ESTE BATCH:**
+${batchIndices.map((idx, i) => {
+      const nameIdx = batchStart + i
+      const name = playerNames[nameIdx]
+      const gender = playerGenders[nameIdx] || 'unknown'
+      return `- Suspect ${idx}: ${name} (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
+    }).join('\n')}\n\nUsa estos nombres EXACTOS para los sospechosos en el orden proporcionado.`
+    : '\n**NOMBRES:** Genera nombres apropiados para todos los sospechosos basándote en el género y ocupación de cada uno.\n'
+  
+  const gendersInfo = playerGenders.length > 0 && batchStart < playerGenders.length
+    ? `\n**GÉNEROS DE JUGADORES PROPORCIONADOS PARA ESTE BATCH:**
+${batchIndices.map((idx, i) => {
+      const genderIdx = batchStart + i
+      return `- Suspect ${idx}: ${playerGenders[genderIdx]}`
+    }).join('\n')}\n\nUsa estos géneros EXACTOS para los sospechosos en el orden proporcionado.\n`
+    : '\n**GÉNEROS:** Asigna géneros apropiados a todos los sospechosos basándote en la ocupación y otros factores.\n'
+
+  const previousSuspectsContext = existingSuspects.length > 0
+    ? `\n**SOSPECHOSOS YA GENERADOS (CONTEXTO):**
+${existingSuspects.map(s => `- ${s.name} (${s.role}): ${s.description || 'Sin descripción'}`).join('\n')}
+\n**IMPORTANTE:** Los nuevos sospechosos deben tener conocimiento de estos sospechosos anteriores y sus relaciones con ellos.`
+    : ''
+
+  const prompt = `
+Genera EXACTAMENTE ${batchSize} sospechosos para un caso de misterio.
+
+**CONFIGURACIÓN:**
+- Tipo de caso: ${request.caseType}
+- Escenario: ${request.scenario}
+- Dificultad: ${request.difficulty}
+- Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
+- Total de sospechosos en el caso: ${request.suspects}
+- Sospechosos a generar en este batch: ${batchStart + 1} a ${batchEnd} (suspect-${batchStart + 1} a suspect-${batchEnd})
+
+**SOSPECHOSOS DE SUPABASE PARA ESTE BATCH:**
+${suspectsInfo}
+${namesInfo}
+${gendersInfo}
+${previousSuspectsContext}
+
+**CRÍTICO - LEER ATENTAMENTE:**
+- 🚨 **NÚMERO DE SOSPECHOSOS - OBLIGATORIO: DEBES generar EXACTAMENTE ${batchSize} sospechosos en el array "suspects".**
+- 🚨 **LISTA OBLIGATORIA DE IDs DE SOSPECHOSOS QUE DEBES GENERAR:**
+${batchIndices.map(idx => `  ${idx}. suspect-${idx}`).join('\n')}
+- 🚨 **El array "suspects" DEBE contener EXACTAMENTE estos ${batchSize} elementos con estos IDs. NO omitas ninguno.**
+${batchIndices.includes(randomGuiltyIndex) ? `- ⚠️ **EL CULPABLE OBLIGATORIAMENTE ES: suspect-${randomGuiltyIndex} (está en este batch)**` : '- ⚠️ **El culpable NO está en este batch, todos deben parecer sospechosos pero ninguno es el culpable real.**'}
+
+**REGLAS PARA SOSPECHOSOS:**
+1. Usa EXACTAMENTE los géneros, edades y ocupaciones proporcionados
+2. ${playerNames.length > 0 && batchStart < playerNames.length ? 'Usa los nombres proporcionados cuando estén disponibles' : 'Genera nombres que coincidan con el género'}
+3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
+4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
+5. **IMPORTANTE:** Todos deben tener "suspicious": true
+6. **CRÍTICO - MOTIVOS:**
+   - ⚠️ **LONGITUD EQUILIBRADA:** Todos los motivos deben tener aproximadamente la MISMA LONGITUD (mismo número de palabras/oraciones).
+   ${batchIndices.includes(randomGuiltyIndex) ? `- El sospechoso suspect-${randomGuiltyIndex} (el culpable) DEBE tener el motivo MÁS FUERTE en términos de CONTENIDO/CONVICCIÓN, no de longitud.` : ''}
+   - Los demás deben tener motivos fuertes pero MENOS CONVINCENTES que el del culpable (misma longitud, menos fuerza en el contenido).
+
+**FORMATO JSON ESPERADO:**
+{
+  "suspects": [
+    ${batchIndices.map((idx, i) => `{
+      "id": "suspect-${idx}",
+      "name": "${playerNames[batchStart + i] || 'Nombre generado apropiado'}",
+      "age": 35,
+      "role": "Ocupación exacta de Supabase",
+      "description": "Descripción de personalidad",
+      "motive": "Motivo para el crimen",
+      "alibi": "Coartada con posibles huecos",
+      "timeGap": "Hueco en la coartada",
+      "suspicious": true,
+      "photo": "URL de Supabase",
+      "traits": ["trait1", "trait2", "trait3"],
+      "lastSeen": "Última vez visto",
+      "gender": "${playerGenders[batchStart + i] || 'male/female'}"
+    }`).join(',\n    ')}
+  ]
+}
+
+**RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
+`
+
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Crea sospechosos para casos de misterio. Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}. Responde SOLO JSON válido.`,
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: Math.min(4000, 1000 + (batchSize * 500)),
+    response_format: { type: 'json_object' },
+  })
+
+  const response = completion.choices[0]?.message?.content
+  if (!response) throw new Error('No response from OpenAI')
+
+  console.log(`✅ Batch ${batchStart + 1}-${batchEnd} generado, parseando...`)
+  const parsed = parseAndRepairJSON(response)
+  
+  if (!parsed.suspects || !Array.isArray(parsed.suspects)) {
+    throw new Error('Invalid response structure: missing suspects array')
+  }
+  
+  if (parsed.suspects.length !== batchSize) {
+    throw new Error(`AI generated ${parsed.suspects.length} suspects but ${batchSize} were requested for this batch`)
+  }
+  
+  return parsed.suspects
+}
+
+/**
+ * PASO 3: Generar hiddenContext
+ */
+async function generateHiddenContext(
+  request: InitialCaseGenerationRequest,
+  language: string,
+  randomGuiltyIndex: number,
+  allSuspects: any[]
+): Promise<any> {
+  const openai = getOpenAIClient()
+  
+  const guiltySuspect = allSuspects.find(s => s.id === `suspect-${randomGuiltyIndex}`)
+  
+  const prompt = `
+Genera el contexto oculto (hiddenContext) para un caso de misterio.
+
+**CONFIGURACIÓN:**
+- Tipo de caso: ${request.caseType}
+- Escenario: ${request.scenario}
+- Dificultad: ${request.difficulty}
+- Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
+- Culpable: suspect-${randomGuiltyIndex} (${guiltySuspect?.name || 'Nombre del culpable'})
+
+**SOSPECHOSOS:**
+${allSuspects.map(s => `- ${s.name} (${s.id}): ${s.role} - ${s.motive || 'Sin motivo'}`).join('\n')}
+
+**FORMATO JSON ESPERADO:**
+{
+  "hiddenContext": {
+    "guiltyId": "suspect-${randomGuiltyIndex}",
+    "guiltyReason": "Razón detallada de por qué suspect-${randomGuiltyIndex} es el culpable (2-3 oraciones)",
+    "keyClues": ["pista1 que conecta con suspect-${randomGuiltyIndex}", "pista2 que conecta con suspect-${randomGuiltyIndex}", "pista3 sutil"],
+    "guiltyTraits": ["trait que conecta con el crimen", "trait que da una pista sutil"]
+  }
+}
+
+**RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
+`
+
+  console.log('🤖 Paso 3: Generando hiddenContext...')
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Crea contexto oculto para casos de misterio. Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}. Responde SOLO JSON válido.`,
+      },
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 1500,
+    response_format: { type: 'json_object' },
+  })
+
+  const response = completion.choices[0]?.message?.content
+  if (!response) throw new Error('No response from OpenAI')
+
+  console.log('✅ HiddenContext generado, parseando...')
+  const parsed = parseAndRepairJSON(response)
+  return parsed.hiddenContext
+}
+
+/**
+ * Guardar caso en Supabase
+ */
+async function saveCaseToSupabase(
+  caseCore: any,
+  victim: any,
+  weapon: any,
+  suspects: any[],
+  hiddenContext: any,
+  request: InitialCaseGenerationRequest
+): Promise<string> {
+  const supabase = getSupabase()
+  
+  console.log('💾 Guardando caso en Supabase...')
+  
+  // 1. Insertar caso
+  const { data: caseData, error: caseError } = await supabase
+    .from('cases')
+    .insert({
+      case_title: caseCore.caseTitle,
+      case_description: caseCore.caseDescription,
+      case_type: request.caseType,
+      scenario: request.scenario,
+      difficulty: request.difficulty,
+      style: request.style || 'realistic',
+      language: request.language || 'es',
+      suspects_count: request.suspects,
+      clues_count: request.clues,
+    })
+    .select()
+    .single()
+  
+  if (caseError) throw new Error(`Error saving case: ${caseError.message}`)
+  const caseId = caseData.id
+  
+  console.log(`✅ Caso guardado con ID: ${caseId}`)
+  
+  // 2. Insertar víctima
+  const { error: victimError } = await supabase
+    .from('case_victims')
+    .insert({
+      case_id: caseId,
+      name: victim.name,
+      age: victim.age,
+      role: victim.role,
+      description: victim.description,
+      cause_of_death: victim.causeOfDeath,
+      time_of_death: victim.timeOfDeath,
+      discovered_by: victim.discoveredBy,
+      location: victim.location,
+      body_position: victim.bodyPosition,
+      visible_injuries: victim.visibleInjuries,
+      objects_at_scene: victim.objectsAtScene,
+      signs_of_struggle: victim.signsOfStruggle,
+    })
+  
+  if (victimError) throw new Error(`Error saving victim: ${victimError.message}`)
+  console.log('✅ Víctima guardada')
+  
+  // 3. Insertar sospechosos
+  const guiltyIdStr = `suspect-${hiddenContext.guiltyId?.replace('suspect-', '') || hiddenContext.guiltyId || ''}`
+  const suspectsToInsert = suspects.map((s) => ({
+    case_id: caseId,
+    suspect_key: s.id,
+    name: s.name,
+    age: s.age,
+    role: s.role,
+    gender: s.gender,
+    description: s.description,
+    motive: s.motive,
+    alibi: s.alibi,
+    time_gap: s.timeGap || null,
+    suspicious: s.suspicious !== false,
+    photo: s.photo || null,
+    traits: s.traits || null,
+    last_seen: s.lastSeen || null,
+    relationship_to_victim: s.relationshipToVictim || null,
+    is_guilty: s.id === guiltyIdStr,
+  }))
+  
+  const { error: suspectsError } = await supabase
+    .from('case_suspects')
+    .insert(suspectsToInsert)
+  
+  if (suspectsError) throw new Error(`Error saving suspects: ${suspectsError.message}`)
+  console.log(`✅ ${suspects.length} sospechosos guardados`)
+  
+  // 4. Insertar hiddenContext (opcional - tabla puede no existir)
+  if (hiddenContext) {
+    const guiltyIdForDb = hiddenContext.guiltyId?.replace('suspect-', '') || hiddenContext.guiltyId
+    const { error: hiddenError } = await supabase
+      .from('case_hidden_context')
+      .insert({
+        case_id: caseId,
+        guilty_suspect_key: `suspect-${guiltyIdForDb}`,
+        guilty_reason: hiddenContext.guiltyReason,
+        key_clues: hiddenContext.keyClues || [],
+        guilty_traits: hiddenContext.guiltyTraits || [],
+      })
+    
+    if (hiddenError) {
+      console.warn('⚠️  No se pudo guardar hiddenContext (tabla puede no existir):', hiddenError.message)
+    } else {
+      console.log('✅ HiddenContext guardado')
+    }
+  }
+  
+  // 5. Insertar arma si existe (opcional - tabla puede no existir)
+  if (weapon) {
+    const { error: weaponError } = await supabase
+      .from('case_weapons')
+      .insert({
+        case_id: caseId,
+        weapon_key: weapon.id || 'weapon-1',
+        name: typeof weapon.name === 'string' ? weapon.name : (weapon.name?.es || weapon.name?.en || ''),
+        description: weapon.description,
+        location: weapon.location,
+        photo: weapon.photo,
+        importance: weapon.importance || 'high',
+      })
+    
+    if (weaponError) {
+      console.warn('⚠️  No se pudo guardar arma (tabla puede no existir):', weaponError.message)
+    } else {
+      console.log('✅ Arma guardada')
+    }
+  }
+  
+  return caseId
+}
+
 generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
   try {
-    console.log('API Route: generate-initial-case called')
+    console.log('API Route: generate-initial-case called (MULTI-STEP)')
     
     const body: InitialCaseGenerationRequest = req.body
     console.log('Request body:', body)
@@ -151,85 +744,53 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     const randomGuiltyIndex = Math.floor(Math.random() * body.suspects) + 1
     console.log(`🎲 Random guilty suggestion: suspect-${randomGuiltyIndex}`)
 
-    const prompt = createInitialCasePrompt(
-      body,
-      selectedSuspects,
-      selectedWeapon,
-      language,
-      randomGuiltyIndex,
-      playerNames,
-      playerGenders
-    )
+    // ============================================
+    // PASO 1: Generar core del caso
+    // ============================================
+    const caseCore = await generateCaseCore(body, selectedSuspects, selectedWeapon, language)
+    console.log('✅ Paso 1 completado: Core del caso generado')
 
-    console.log('🤖 Calling OpenAI for initial case generation...')
-
-    const openai = getOpenAIClient()
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Crea casos de misterio. Idioma: ${
-            language === 'es' ? 'ESPAÑOL' : 'INGLÉS'
-          }. El culpable es FIJO (suspect-X indicado). NO cambies el culpable. Responde SOLO JSON válido.`,
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 3000,
-      response_format: { type: 'json_object' },
-    })
-
-    const response = completion.choices[0]?.message?.content
-    if (!response) throw new Error('No response from OpenAI')
-
-    console.log('✅ OpenAI response received')
-    console.log(`   Response length: ${response.length} characters`)
-
-    // ===============================
-    // VALIDACIÓN DURA ANTES DEL PARSE
-    // ===============================
-    const trimmed = response.trim()
-
-    if (!trimmed.endsWith('}')) {
-      return res.status(502).json({
-        error: 'AI_GENERATION_FAILED',
-        details: 'Model returned incomplete JSON (not closed)',
-      })
+    // ============================================
+    // PASO 2: Generar sospechosos en batches
+    // ============================================
+    const BATCH_SIZE = 3 // Generar 3 sospechosos a la vez
+    const allSuspects: any[] = []
+    
+    for (let batchStart = 0; batchStart < body.suspects; batchStart += BATCH_SIZE) {
+      const batch = await generateSuspectsBatch(
+        body,
+        selectedSuspects,
+        language,
+        randomGuiltyIndex,
+        playerNames,
+        playerGenders,
+        allSuspects, // Pasar sospechosos anteriores como contexto
+        batchStart,
+        Math.min(BATCH_SIZE, body.suspects - batchStart)
+      )
+      allSuspects.push(...batch)
+      console.log(`✅ Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} completado: ${batch.length} sospechosos generados`)
     }
+    
+    console.log(`✅ Paso 2 completado: ${allSuspects.length} sospechosos generados`)
 
-    const quoteCount = (trimmed.match(/"/g) || []).length
-    if (quoteCount % 2 !== 0) {
-      return res.status(502).json({
-        error: 'AI_GENERATION_FAILED',
-        details: 'Model returned malformed JSON (unbalanced quotes)',
-      })
-    }
-
-    let parsedCase: InitialCaseResponse
-    try {
-      parsedCase = JSON.parse(trimmed)
-      console.log('✅ JSON parsed successfully')
-    } catch (err) {
-      console.error('❌ JSON.parse failed despite validation')
-      return res.status(502).json({
-        error: 'AI_GENERATION_FAILED',
-        details: 'Model returned invalid JSON',
-      })
+    // Validar número de sospechosos
+    if (allSuspects.length !== body.suspects) {
+      throw new Error(`AI generated ${allSuspects.length} suspects instead of ${body.suspects}`)
     }
 
     // Aplicar nombres de jugadores
-    if (parsedCase.suspects && playerNames.length > 0) {
-      parsedCase.suspects = parsedCase.suspects.map((s: any, i: number) => ({
-        ...s,
-        name: playerNames[i] || String(s.name || ''),
-      }))
+    if (allSuspects && playerNames.length > 0) {
+      allSuspects.forEach((s, i) => {
+        if (playerNames[i]) {
+          s.name = playerNames[i]
+        }
+      })
     }
 
     // Matching con Supabase
-    if (parsedCase.suspects && selectedSuspects) {
+    if (allSuspects && selectedSuspects) {
       console.log('🔧 Matching suspects to Supabase photos...')
-
       const remaining = [...selectedSuspects]
       const usedIds = new Set<string>()
 
@@ -246,7 +807,7 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
         return score
       }
 
-      parsedCase.suspects = parsedCase.suspects.map((gen: any) => {
+      allSuspects.forEach((gen) => {
         let best = null as any
         let bestScore = -1
 
@@ -263,30 +824,63 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
 
         if (best?.image_url) {
           console.log(`✅ Matched "${gen.name}" → ${best.occupation?.es}`)
-        }
-
-        return {
-          ...gen,
-          photo: best?.image_url || gen.photo,
+          gen.photo = best.image_url
         }
       })
     }
 
-    if (selectedWeapon && parsedCase.weapon) {
-      parsedCase.weapon.photo = selectedWeapon.image_url
+    // ============================================
+    // PASO 3: Generar hiddenContext
+    // ============================================
+    const hiddenContext = await generateHiddenContext(
+      body,
+      language,
+      randomGuiltyIndex,
+      allSuspects
+    )
+    // Asegurar que guiltyId esté en el formato correcto
+    hiddenContext.guiltyId = `suspect-${randomGuiltyIndex}`
+    console.log('✅ Paso 3 completado: HiddenContext generado')
+
+    // ============================================
+    // Guardar en Supabase
+    // ============================================
+    const caseId = await saveCaseToSupabase(
+      caseCore,
+      caseCore.victim,
+      caseCore.weapon,
+      allSuspects,
+      hiddenContext,
+      body
+    )
+    console.log(`✅ Caso guardado en Supabase con ID: ${caseId}`)
+
+    // Construir respuesta
+    const response: InitialCaseResponse = {
+      id: caseId,
+      caseTitle: caseCore.caseTitle,
+      caseDescription: caseCore.caseDescription,
+      victim: caseCore.victim,
+      suspects: allSuspects,
+      weapon: caseCore.weapon,
+      hiddenContext: {
+        ...hiddenContext,
+        guiltyId: `suspect-${randomGuiltyIndex}`,
+      },
+      config: {
+        caseType: body.caseType,
+        totalClues: body.clues,
+        scenario: body.scenario,
+        difficulty: body.difficulty,
+      },
+      supabaseSuspects: selectedSuspects,
     }
 
-    parsedCase.config = {
-      caseType: body.caseType,
-      totalClues: body.clues,
-      scenario: body.scenario,
-      difficulty: body.difficulty,
-    }
+    console.log('✅ Initial case generated successfully (MULTI-STEP)')
+    console.log(`   Guilty: suspect-${randomGuiltyIndex}`)
+    console.log(`   Suspects: ${allSuspects.length}`)
 
-    console.log('✅ Initial case generated successfully')
-    console.log(`   Guilty: ${parsedCase.hiddenContext.guiltyId}`)
-
-    return res.json(parsedCase)
+    return res.json(response)
   } catch (error) {
     console.error('Error in generate-initial-case API:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
@@ -297,331 +891,3 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     })
   }
 })
-
-
-/**
- * Intenta reparar strings no terminados en JSON
- * Esta función detecta y cierra strings que no tienen comillas de cierre
- */
-function fixUnterminatedStrings(jsonString: string): string {
-  let result = jsonString
-  let inString = false
-  let escapeNext = false
-  let stringStart = -1
-  const stack: number[] = [] // Para rastrear dónde empezaron los strings
-  
-  // Primera pasada: identificar strings no terminados
-  for (let i = 0; i < result.length; i++) {
-    const char = result[i]
-    
-    if (escapeNext) {
-      escapeNext = false
-      continue
-    }
-    
-    if (char === '\\') {
-      escapeNext = true
-      continue
-    }
-    
-    if (char === '"') {
-      if (inString) {
-        // Cerramos un string
-        inString = false
-        if (stack.length > 0) {
-          stack.pop()
-        }
-      } else {
-        // Abrimos un string
-        inString = true
-        stringStart = i
-        stack.push(i)
-      }
-    }
-  }
-  
-  // Si hay strings abiertos, intentar cerrarlos
-  if (inString && stringStart >= 0) {
-    // Buscar el último carácter válido del JSON
-    const lastBrace = result.lastIndexOf('}')
-    const lastBracket = result.lastIndexOf(']')
-    const lastValidPos = Math.max(lastBrace, lastBracket, 0)
-    
-    // Si el string abierto está antes del final válido, intentar cerrarlo
-    if (stringStart < lastValidPos) {
-      // Buscar el siguiente carácter que debería cerrar el string
-      // Buscar hacia adelante desde stringStart
-      let insertPos = stringStart + 1
-      let foundInsertPos = false
-      
-      while (insertPos < result.length && insertPos <= lastValidPos) {
-        const char = result[insertPos]
-        // Si encontramos un carácter que normalmente cerraría un valor JSON
-        if (char === ',' || char === '}' || char === ']') {
-          // Verificar que no estemos en medio de un escape
-          let isEscaped = false
-          let checkPos = insertPos - 1
-          let backslashCount = 0
-          while (checkPos >= stringStart && result[checkPos] === '\\') {
-            backslashCount++
-            checkPos--
-          }
-          isEscaped = backslashCount % 2 === 1
-          
-          if (!isEscaped) {
-            result = result.slice(0, insertPos) + '"' + result.slice(insertPos)
-            foundInsertPos = true
-            break
-          }
-        }
-        insertPos++
-      }
-      
-      // Si no encontramos un lugar apropiado, cerrar justo antes del último }
-      if (!foundInsertPos && lastValidPos > stringStart) {
-        result = result.slice(0, lastValidPos) + '"' + result.slice(lastValidPos)
-      }
-    } else {
-      // El string está al final, simplemente cerrarlo
-      result = result + '"'
-    }
-  }
-  
-  return result
-}
-
-function createInitialCasePrompt(
-  request: InitialCaseGenerationRequest,
-  selectedSuspects: any[],
-  selectedWeapon: any,
-  language: string,
-  randomGuiltyIndex: number,
-  playerNames: string[],
-  playerGenders: string[]
-): string {
-  const { caseType, suspects, clues, scenario, difficulty } = request
-
-  const suspectsInfo = selectedSuspects.map(s => `
-- Género: ${s.gender}
-- Edad aproximada: ${s.approx_age}
-- Ocupación: ${language === 'es' ? s.occupation?.es : s.occupation?.en || s.occupation}
-- Tags: ${s.tags?.join(', ') || 'sin tags'}
-- URL de imagen: ${s.image_url}
-`).join('\n')
-
-  const weaponInfo = selectedWeapon ? `
-**ARMA HOMICIDA:**
-- Nombre: ${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}
-- Tags: ${selectedWeapon.tags?.join(', ') || 'sin tags'}
-- URL de imagen: ${selectedWeapon.image_url}
-` : ''
-
-  const namesInfo = playerNames.length > 0 
-    ? `\n**NOMBRES DE JUGADORES PROPORCIONADOS:**\n${playerNames.map((name, i) => {
-        const gender = playerGenders[i] || 'unknown'
-        return `- Suspect ${i + 1}: ${name} (${gender === 'male' ? 'hombre' : gender === 'female' ? 'mujer' : 'desconocido'})`
-      }).join('\n')}\n\nUsa estos nombres EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que nombres, genera nombres apropiados para los restantes basándote en el género y ocupación de cada uno.`
-    : '\n**NOMBRES:** Genera nombres apropiados para todos los sospechosos basándote en el género y ocupación de cada uno.\n'
-  
-  const gendersInfo = playerGenders.length > 0
-    ? `\n**GÉNEROS DE JUGADORES PROPORCIONADOS:**\n${playerGenders.map((gender, i) => `- Suspect ${i + 1}: ${gender}`).join('\n')}\n\nUsa estos géneros EXACTOS para los sospechosos en el orden proporcionado. Si hay más sospechosos que géneros, asigna géneros apropiados basándote en la ocupación y otros factores.\n`
-    : '\n**GÉNEROS:** Asigna géneros apropiados a todos los sospechosos basándote en la ocupación y otros factores.\n'
-
-  return `
-Genera la introducción de un caso de misterio con la siguiente configuración:
-
-**CONFIGURACIÓN:**
-- Tipo de caso: ${caseType}
-- Número de sospechosos: ${suspects}
-- Número total de pistas (se generarán dinámicamente): ${clues}
-- Escenario: ${scenario}
-- Dificultad: ${difficulty}
-
-**SOSPECHOSOS DE SUPABASE:**
-${suspectsInfo}
-${namesInfo}
-${gendersInfo}
-
-**REGLAS PARA SOSPECHOSOS:**
-1. Usa EXACTAMENTE los géneros, edades y ocupaciones proporcionados
-2. ${playerNames.length > 0 ? 'Usa los nombres proporcionados cuando estén disponibles, genera nombres apropiados para los restantes' : 'Genera nombres que coincidan con el género'}
-3. Usa EXACTAMENTE las URLs de imagen proporcionadas como campo "photo"
-4. Agrega descripción de personalidad, motivo para el crimen, coartada con huecos
-5. **IMPORTANTE:** Todos deben tener "suspicious": true
-6. **CRÍTICO - MOTIVOS:**
-   - ⚠️ **LONGITUD EQUILIBRADA:** Todos los motivos deben tener aproximadamente la MISMA LONGITUD (mismo número de palabras/oraciones). NO hagas el motivo del culpable más largo que los demás.
-   - El sospechoso suspect-${randomGuiltyIndex} (el culpable) DEBE tener el motivo MÁS FUERTE en términos de CONTENIDO/CONVICCIÓN, no de longitud.
-   - Los demás deben tener motivos fuertes pero MENOS CONVINCENTES que el del culpable (misma longitud, menos fuerza en el contenido).
-   - El motivo del culpable debe ser tan convincente (por su contenido) que, incluso si hay pistas que sugieren otra cosa (como que es alguien del personal), el motivo debe ser lo suficientemente fuerte para que el jugador pueda descartar esas pistas como menos relevantes.
-   - Ejemplo: Si los demás motivos son 1-2 oraciones, el del culpable también debe ser 1-2 oraciones, pero más convincente.
-
-${weaponInfo}
-
-**VÍCTIMA - DETALLES COMPLETOS OBLIGATORIOS:**
-Crea una víctima con TODOS estos campos (NO OMITIR NINGUNO):
-- Nombre, edad, rol/profesión
-- Descripción BREVE de su personalidad (1-2 oraciones máximo)
-${caseType === 'asesinato' ? `- **causeOfDeath**: Causa de muerte específica y detallada (relacionada con el arma: ${language === 'es' ? selectedWeapon?.name.es : selectedWeapon?.name.en || 'arma genérica'})` : ''}
-- **timeOfDeath**: Hora de muerte estimada (ej: "Entre las 9:45pm y 10:15pm según la temperatura corporal")
-- **discoveredBy**: Quién encontró el cuerpo CON LA HORA (ej: "[Nombre del sospechoso que descubrió el cuerpo], [rol/profesión] a las [hora]" o "[rol/profesión] [nombre del sospechoso que descubrió el cuerpo] a las [hora]", esto puede variar, cualquier persona pudo haber encontrado a la victima, esto es solo un ejemplo, sea el culpable o cualquier otro sospechoso")
-- **location**: Ubicación exacta y detallada (ej: "En su oficina privada del segundo piso, tirado junto al escritorio")
-- **bodyPosition**: Descripción detallada de la posición del cuerpo (ej: "Boca arriba, brazos extendidos, señales de lucha")
-- **visibleInjuries**: Heridas visibles específicas (ej: "Tres heridas de arma blanca en el pecho, sangre seca alrededor")
-- **objectsAtScene**: Objetos específicos encontrados en la escena (ej: "Un cuchillo ensangrentado a 2 metros, copa volcada, documentos esparcidos")
-- **signsOfStruggle**: Señales de lucha detalladas (ej: "Silla volcada, lámpara rota, papeles desordenados")
-
-**CRÍTICO - VÍCTIMA:**
-- TODOS los campos deben estar completos
-- NO dejar campos vacíos o con "N/A"
-- Cada detalle debe ser específico y coherente con el culpable
-
-${caseType === 'asesinato' && selectedWeapon ? `
-**ARMA (SOLO PARA ASESINATO):**
-Incluye el arma con:
-- Nombre: "${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}"
-- Descripción detallada del arma
-- Ubicación donde se encontró
-- Importancia: "high"
-- Photo: "${selectedWeapon.image_url}"
-` : ''}
-
-**CULPABLE FIJO - OBLIGATORIO:**
-🎲 **EL CULPABLE DEBE SER: suspect-${randomGuiltyIndex}**
-
-⚠️ **ESTO NO ES UNA SUGERENCIA - ES OBLIGATORIO:**
-- El culpable para este caso ES: suspect-${randomGuiltyIndex}
-- NO elijas otro sospechoso diferente
-- NO cambies el culpable basándose en las decisiones del jugador
-- El culpable queda FIJO desde esta primera generación
-- NO sigas patrones (siempre suspect-1, siempre el último, etc.)
-
-**REGLAS SOBRE EL CULPABLE (suspect-${randomGuiltyIndex}):**
-- ⚠️ **CRÍTICO: Debe tener el MOTIVO MÁS FUERTE de TODOS los sospechosos**
-- ⚠️ **IMPORTANTE: El motivo debe tener LONGITUD SIMILAR a los demás (NO más largo)**
-- El motivo del culpable debe ser más poderoso en CONTENIDO/CONVICCIÓN, no en longitud
-- Debe tener conexión lógica y profunda con la víctima
-- El motivo debe ser tan fuerte que, incluso si hay pistas que sugieren otra cosa (como que es alguien del personal), el motivo del culpable debe ser lo suficientemente convincente para que el jugador pueda descartar esas pistas como falsas o menos relevantes
-- Debe tener acceso al arma o escena del crimen
-- Sus traits deben conectar sutilmente con el método del crimen
-- Las pistas que apunten a él deben ser SUTILES pero DESCUBRIBLES
-- El motivo debe incluir elementos personales, profesionales o emocionales que lo hagan el más convincente, pero expresados de forma concisa (igual longitud que los demás)
-
-**REGLAS SOBRE LOS OTROS SOSPECHOSOS:**
-- TODOS los demás sospechosos deben TAMBIÉN parecer culpables
-- Dales motivos creíbles y fuertes, con LONGITUD SIMILAR al del culpable
-- ⚠️ **CRÍTICO: Todos los motivos deben tener aproximadamente la misma longitud (mismo número de palabras/oraciones)**
-- El motivo del culpable debe ser más convincente por su CONTENIDO, no por ser más largo
-- Dales coartadas con huecos sospechosos
-- Haz que sus traits también conecten con el crimen
-- La diferencia está en las PISTAS SUTILES que solo apuntan al culpable real (suspect-${randomGuiltyIndex}) Y EN EL MOTIVO MÁS FUERTE (por contenido, no por longitud)
-- El jugador debe poder DEDUCIR quién es el culpable conectando todas las pistas Y comparando la fuerza de los motivos (no la longitud)
-
-**CONTEXTO OCULTO (hiddenContext):**
-En el objeto "hiddenContext" incluye:
-- "guiltyId": ID del sospechoso culpable (usa el mismo ID que en el array de suspects)
-- "guiltyReason": Razón detallada de por qué es culpable (2-3 oraciones)
-- "keyClues": Array de 3-5 pistas clave que apuntan al culpable
-- "guiltyTraits": Array de traits del culpable que conectan con el crimen
-
-**FORMATO JSON ESPERADO:**
-{
-  "caseTitle": "Título del caso",
-  "caseDescription": "Descripción breve",
-  "victim": {
-    "name": "Nombre",
-    "age": 45,
-    "role": "Profesión",
-    "description": "Descripción breve de personalidad (1-2 oraciones)",
-    "causeOfDeath": "Causa específica",
-    "timeOfDeath": "Entre 9:45pm y 10:15pm",
-    "discoveredBy": "Sofía, la sumeller a las 11:00pm",
-    "location": "Ubicación exacta",
-    "bodyPosition": "Descripción de la posición",
-    "visibleInjuries": "Heridas visibles",
-    "objectsAtScene": "Objetos encontrados",
-    "signsOfStruggle": "Señales de lucha"
-  },
-  "suspects": [
-    {
-      "id": "suspect-1",
-      "name": "${playerNames[0] || 'Nombre generado apropiado'}",
-      "age": 35,
-      "role": "Ocupación exacta de Supabase",
-      "description": "Descripción de personalidad",
-      "motive": "Motivo para el crimen",
-      "alibi": "Coartada con posibles huecos",
-      "timeGap": "Hueco en la coartada",
-      "suspicious": true,
-      "photo": "URL de Supabase",
-      "traits": ["trait1", "trait2", "trait3"],
-      "lastSeen": "Última vez visto",
-      "gender": "${playerGenders[0] || 'male/female'}"
-    }${playerNames[1] ? `,
-    {
-      "id": "suspect-2",
-      "name": "${playerNames[1]}",
-      "gender": "${playerGenders[1] || 'male/female'}"
-    }` : ''}${playerNames[2] ? `,
-    {
-      "id": "suspect-3",
-      "name": "${playerNames[2]}",
-      "gender": "${playerGenders[2] || 'male/female'}"
-    }` : ''}${playerNames[3] ? `,
-    {
-      "id": "suspect-4",
-      "name": "${playerNames[3]}",
-      "gender": "${playerGenders[3] || 'male/female'}"
-    }` : ''}
-  ],
-  ${caseType === 'asesinato' ? `"weapon": {
-    "id": "weapon-1",
-    "name": "${language === 'es' ? selectedWeapon?.name.es : selectedWeapon?.name.en || 'arma'}",
-    "description": "Descripción detallada",
-    "location": "Donde se encontró",
-    "photo": "${selectedWeapon?.image_url || ''}",
-    "importance": "high"
-  },` : ''}
-  "hiddenContext": {
-    "guiltyId": "suspect-${randomGuiltyIndex}",
-    "guiltyReason": "Razón detallada de por qué suspect-${randomGuiltyIndex} es el culpable (2-3 oraciones)",
-    "keyClues": ["pista1 que conecta con suspect-${randomGuiltyIndex}", "pista2 que conecta con suspect-${randomGuiltyIndex}", "pista3 sutil"],
-    "guiltyTraits": ["trait que conecta con el crimen", "trait que da una pista sutil"]
-  }
-}
-
-**CRÍTICO - LEER ATENTAMENTE:**
-- ⚠️ **EL CULPABLE OBLIGATORIAMENTE ES: suspect-${randomGuiltyIndex}**
-- ⚠️ **NO cambies este ID bajo ninguna circunstancia**
-${playerNames.length > 0 ? `- 🚨 **NOMBRES OBLIGATORIOS - DEBES USAR EXACTAMENTE ESTOS NOMBRES:**
-  ${playerNames.map((name, i) => `  - suspect-${i + 1} → "${name}"`).join('\n  ')}
-  - NO inventes nombres diferentes. NO uses variaciones. NO cambies estos nombres bajo ninguna circunstancia.
-  - Si hay más sospechosos que nombres, genera nombres apropiados SOLO para los sospechosos sin nombre asignado.
-  - Usa estos nombres EXACTOS en el orden proporcionado.` : ''}
-${playerGenders.length > 0 ? `- 🚨 **GÉNEROS OBLIGATORIOS - DEBES USAR EXACTAMENTE ESTOS GÉNEROS:**
-  ${playerGenders.map((gender, i) => `  - suspect-${i + 1} → "${gender}"`).join('\n  ')}
-  - NO cambies estos géneros bajo ninguna circunstancia.
-  - Si hay más sospechosos que géneros, asigna géneros apropiados SOLO para los sospechosos sin género asignado.` : ''}
-- El culpable (suspect-${randomGuiltyIndex}) queda FIJO desde ahora y NO cambiará durante el juego
-- TODOS los sospechosos deben parecer culpables con motivos fuertes
-- Las pistas sutiles que solo apuntan a suspect-${randomGuiltyIndex} son las que revelarán al culpable
-- El jugador debe conectar las pistas para deducir que es suspect-${randomGuiltyIndex}
-- El JSON debe ser válido, sin errores
-- Todos los strings en una sola línea
-- **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
-
-
-🚨 REGLAS CRÍTICAS DE FORMATO (OBLIGATORIAS):
-1. Responde EXCLUSIVAMENTE con un objeto JSON válido.
-2. NO incluyas texto fuera del JSON (nada de explicaciones, markdown o comentarios).
-3. NO generes textocifrado, tokens, hashes, JWTs, Base64, IDs largos ni secuencias sin espacios.
-4. Usa solo lenguaje narrativo humano y natural.
-5. Evita cadenas largas sin espacios o con muchos símbolos.
-6. Todos los strings DEBEN:
-   - empezar y terminar con comillas normales (")
-   - NO contener saltos de línea no escapados
-7. NO inventes documentos, archivos, registros técnicos, logs, códigos ni datos serializados.
-8. Si no estás seguro de un valor, usa un string corto y simple.
-9. El JSON DEBE cerrarse correctamente (llaves y corchetes balanceados).
-
-`
-}
