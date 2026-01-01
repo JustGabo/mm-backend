@@ -3,6 +3,7 @@ import { SuspectService } from '../services/suspect-service.js';
 import { WeaponService } from '../services/weapon-service.js';
 import { getSupabase } from '../services/supabase.js';
 import OpenAI from 'openai';
+import { CustomScenario, buildCustomScenarioText } from './generate-initial-case.js';
 
 // Lazy initialization - solo crea el cliente cuando se necesite
 let openaiClient: OpenAI | null = null;
@@ -30,7 +31,8 @@ export interface ImpostorCaseGenerationRequest {
   caseType: string;
   suspects: number;
   clues: number;
-  scenario: string;
+  scenario?: string; // Opcional: escenario fijo (mansion, hotel, etc.)
+  customScenario?: CustomScenario; // Opcional: escenario personalizado con lugar y tema/situación
   difficulty: string;
   style?: 'realistic' | 'pixel';
   language?: string;
@@ -93,6 +95,7 @@ export interface ImpostorCaseResponse {
     caseType: string;
     totalClues: number;
     scenario: string;
+    customScenario?: CustomScenario;
     difficulty: string;
   };
 }
@@ -270,15 +273,29 @@ async function generateImpostorCaseCore(
 ): Promise<{ caseTitle: string; caseDescription: string; victim: any; weapon?: any }> {
   const openai = getOpenAIClient()
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Debes crear un caso que se ajuste perfectamente a este escenario personalizado. Usa tu creatividad para adaptar todos los elementos (víctima, ubicación, detalles) a este contexto específico.`
+    : ''
+
   const prompt = `
 Genera SOLO el core de un caso de misterio tipo "IMPOSTOR" (como Among Us) con la siguiente configuración:
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Quien descubrió el cuerpo: player-${discoveredByPlayerIndex}
+${customScenarioDetails}
 
 ${selectedWeapon ? `**ARMA HOMICIDA:**
 - Nombre: ${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}
@@ -408,18 +425,32 @@ ${existingPlayers.map(p => `- ${p.name} (${p.role}): ${p.description || 'Sin des
 \n**IMPORTANTE:** Los nuevos jugadores deben tener conocimiento de estos jugadores anteriores y sus relaciones con ellos. Si hubo conversaciones o encuentros, deben estar documentados en ambos jugadores.`
     : ''
 
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Los jugadores deben tener roles y ocupaciones que tengan sentido en este escenario personalizado. Adapta sus profesiones, motivos y relaciones al contexto específico proporcionado.`
+    : ''
+
   const prompt = `
 Genera EXACTAMENTE ${batchSize} jugadores para un caso de misterio tipo "IMPOSTOR" (como Among Us).
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Total de jugadores en el caso: ${request.suspects}
 - Jugadores a generar en este batch: ${batchStart + 1} a ${batchEnd} (player-${batchStart + 1} a player-${batchEnd})
 - Quien descubrió el cuerpo: player-${discoveredByPlayerIndex}
 ${batchIndices.includes(discoveredByPlayerIndex) ? `- ⚠️ **UN JUGADOR DE ESTE BATCH (player-${discoveredByPlayerIndex}) DESCUBRIÓ EL CUERPO**` : ''}
+${customScenarioDetails}
 
 **JUGADORES DE SUPABASE PARA ESTE BATCH:**
 ${suspectsInfo}
@@ -518,15 +549,29 @@ async function generateImpostorHiddenContext(
   
   const killerPlayer = allPlayers.find(p => p.id === `player-${randomKillerIndex}`)
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Las pistas clave y razones del asesino deben estar relacionadas con este escenario personalizado.`
+    : ''
+
   const prompt = `
 Genera el contexto oculto (hiddenContext) para un caso de misterio tipo impostor.
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Asesino: player-${randomKillerIndex} (${killerPlayer?.name || 'Nombre del asesino'})
+${customScenarioDetails}
 
 **JUGADORES:**
 ${allPlayers.map(p => `- ${p.name} (${p.id}): ${p.role} - ${p.isKiller ? 'ASESINO' : 'INOCENTE'}`).join('\n')}
@@ -575,8 +620,17 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
     console.log('Request body:', body);
     
     // Validate required fields
-    if (!body.caseType || !body.suspects || !body.clues || !body.scenario || !body.difficulty) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!body.caseType || !body.suspects || !body.clues || !body.difficulty) {
+      return res.status(400).json({ error: 'Missing required fields: caseType, suspects, clues, difficulty' });
+    }
+
+    // Validar que solo haya scenario o customScenario, no ambos
+    if (body.scenario && body.customScenario) {
+      return res.status(400).json({ error: 'Cannot provide both scenario and customScenario. Provide only one.' });
+    }
+
+    if (!body.scenario && !body.customScenario) {
+      return res.status(400).json({ error: 'Must provide either scenario or customScenario' });
     }
 
     const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body;
@@ -599,14 +653,26 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
         }).filter(g => g);
 
     // Obtener sospechosos reales desde Supabase
+    // Si hay customScenario, no pasar scene (obtendrá aleatorios)
+    const sceneForService = body.customScenario ? undefined : body.scenario;
+    
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`);
+    if (body.customScenario) {
+      console.log(`🎨 Custom scenario detected: "${buildCustomScenarioText(body.customScenario)}" - fetching random suspects`);
+      console.log(`   Place: ${body.customScenario.place}`);
+      if (body.customScenario.themeOrSituation) {
+        console.log(`   Theme/Situation: ${body.customScenario.themeOrSituation}`);
+      }
+    } else {
+      console.log(`📍 Fixed scenario: ${body.scenario}`);
+    }
     if (playerGenders.length > 0) {
       console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`);
     }
     
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
-      scene: body.scenario,
+      scene: sceneForService,
       style: body.style,
       preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     });
@@ -614,13 +680,14 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`);
 
     // Seleccionar arma para casos de asesinato
+    // Si hay customScenario, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null;
     if (body.caseType === 'asesinato') {
       console.log(`🔫 Selecting murder weapon...`);
       selectedWeapon = await WeaponService.selectWeapon({
-        scene: body.scenario,
+        scene: sceneForService,
         style: body.style,
-        preferSpecific: true
+        preferSpecific: !body.customScenario, // No preferir específica si es custom
       });
       console.log(`✅ Selected weapon: ${selectedWeapon?.name?.es}`);
     }
@@ -773,7 +840,10 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
       config: {
         caseType: body.caseType,
         totalClues: body.clues,
-        scenario: body.scenario,
+        scenario: body.customScenario 
+          ? buildCustomScenarioText(body.customScenario)
+          : (body.scenario || 'aleatorio'),
+        customScenario: body.customScenario || undefined,
         difficulty: body.difficulty,
       },
     };

@@ -15,7 +15,7 @@ const testRoomId = process.env.TEST_ROOM_ID || 'test-room-id'
 
 // Si quieres forzar un número específico de sospechosos, úsalo aquí
 // Si es null, usará el número real de jugadores en la sala
-const FORCE_SUSPECTS_COUNT = process.env.FORCE_SUSPECTS_COUNT ? parseInt(process.env.FORCE_SUSPECTS_COUNT) : null
+const FORCE_SUSPECTS_COUNT = 3
 
 // Health check
 async function checkServerHealth() {
@@ -114,7 +114,10 @@ async function testGenerateImpostorPhases() {
       caseType: 'asesinato',
       suspects: suspectsCount,
       clues: 8,
-      scenario: 'hotel',
+      customScenario: {
+        place: 'Crucero de lujo',
+        themeOrSituation: 'es un viaje en un crucero de lujo por el Mediterráneo'
+      },
       difficulty: 'normal',
       style: 'realistic' as const,
       language: 'es' // Español
@@ -281,6 +284,26 @@ async function testGenerateImpostorPhases() {
       throw new Error('Missing config')
     }
     console.log(`   ✅ Config: ${JSON.stringify(data.config)}`)
+    
+    // 9. Validar customScenario si está presente
+    if (testData.customScenario) {
+      if (!data.config?.customScenario) {
+        throw new Error('❌ customScenario no está en la respuesta')
+      }
+      const received = data.config.customScenario
+      if (received.place !== testData.customScenario.place) {
+        throw new Error(`❌ customScenario.place no coincide: esperado "${testData.customScenario.place}", recibido "${received.place}"`)
+      }
+      if (testData.customScenario.themeOrSituation && received.themeOrSituation !== testData.customScenario.themeOrSituation) {
+        throw new Error(`❌ customScenario.themeOrSituation no coincide: esperado "${testData.customScenario.themeOrSituation}", recibido "${received.themeOrSituation}"`)
+      }
+      console.log(`   ✅ Custom scenario válido: "${received.place}"${received.themeOrSituation ? ` - "${received.themeOrSituation}"` : ''}`)
+    } else if ('scenario' in testData && testData.scenario) {
+      if (data.config?.scenario !== testData.scenario) {
+        throw new Error(`❌ scenario no coincide: esperado "${testData.scenario}", recibido "${data.config?.scenario}"`)
+      }
+      console.log(`   ✅ Scenario válido: "${data.config.scenario}"`)
+    }
 
     // Resumen
     console.log('\n' + '='.repeat(60))
