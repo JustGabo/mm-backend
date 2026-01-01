@@ -1,9 +1,12 @@
+import { CustomScenario } from '../routes/generate-initial-case.js'
+
 export interface ImpostorPhasesGenerationRequest {
     roomId: string
     caseType: string
     suspects: number
     clues: number
-    scenario: string
+    scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
+    customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
     difficulty: string
     style?: 'realistic' | 'pixel'
     language?: string
@@ -75,6 +78,7 @@ export interface ImpostorPhasesGenerationRequest {
       caseType: string
       totalClues: number
       scenario: string
+      customScenario?: CustomScenario
       difficulty: string
     }
   }

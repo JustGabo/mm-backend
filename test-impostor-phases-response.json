@@ -1,0 +1,217 @@
+{
+  "caseTitle": "Asesinato en el Crucero del Misterio",
+  "caseDescription": "Durante un lujoso viaje por el Mediterráneo, un pasajero es encontrado muerto en el campo de golf del crucero. Todo apunta a un asesinato en un ambiente donde nadie parece ser lo que dice ser.",
+  "victim": {
+    "name": "Fernando Del Río",
+    "age": 52,
+    "role": "Empresario",
+    "description": "Un carismático empresario de tecnología, conocido por su carácter fuerte y su éxito en los negocios. Era el alma de la fiesta, siempre rodeado de admiradores.",
+    "causeOfDeath": "Golpes contundentes en la cabeza provocados por un palo de golf, que le causaron un traumatismo craneoencefálico severo.",
+    "timeOfDeath": "22:30",
+    "timeOfDiscovery": "22:45",
+    "discoveredBy": "Lola",
+    "location": "Campo de golf del crucero",
+    "bodyPosition": "Tumbado de espaldas, con el cuerpo parcialmente enrollado sobre sí mismo.",
+    "visibleInjuries": "Grande contusión en la cabeza, sangre alrededor, y una herida abierta en la frente.",
+    "objectsAtScene": "Un palo de golf manchado de sangre, una bola de golf, y una bebida derramada.",
+    "signsOfStruggle": "Se encontraron marcas de rasguños en el suelo alrededor del cuerpo y un par de huellas dactilares en el palo de golf."
+  },
+  "players": [
+    {
+      "playerId": "46a189e1-21d9-4e9d-ab93-8f81e8580feb",
+      "phase1": {
+        "name": "Lola",
+        "occupation": "Dramaturga",
+        "relationshipWithVictim": "Compañera de teatro y amiga cercana de la víctima.",
+        "description": "Soy una apasionada de las obras de teatro. Me encanta crear historias que toquen el corazón de los demás.",
+        "gender": "female"
+      },
+      "phase2": {
+        "observations": [
+          "Vi a Papito discutiendo con la víctima sobre la dirección de la obra que estaban preparando.",
+          "Noté que Jugador 3 parecía incómoda después de escuchar la discusión entre Papito y la víctima.",
+          "Escuché a todos hablar sobre el estrés que generaba la obra en la última reunión."
+        ]
+      },
+      "phase3": {
+        "timeline": [
+          {
+            "time": "8:40 PM",
+            "location": "Cafetería del teatro",
+            "activity": "Estaba tomando un café y revisando mi libreta de notas.",
+            "observations": [
+              "Vi a Papito en la mesa de al lado hablando en voz alta con la víctima.",
+              "Escuché a Jugador 3 comentar que la obra necesitaba más ensayos."
+            ]
+          },
+          {
+            "time": "9:05 PM",
+            "location": "Sala de ensayos",
+            "activity": "Asistí al ensayo de la obra.",
+            "observations": [
+              "Vi a Jugador 3 revisar su vestuario y a Papito dando indicaciones a todos los actores.",
+              "Noté que la víctima estaba un poco distante durante el ensayo."
+            ]
+          },
+          {
+            "time": "9:20 PM",
+            "location": "Pasillo del teatro (momento del crimen)",
+            "activity": "Fui a buscar a la víctima para hablar de la obra.",
+            "observations": [
+              "Vi a Papito salir rápidamente del pasillo justo antes de encontrar el cuerpo.",
+              "Escuché un grito proveniente del pasillo y corrí para ver qué pasaba."
+            ]
+          }
+        ]
+      },
+      "phase4": {
+        "isKiller": false,
+        "whySuspicious": "Papito tenía un altercado con la víctima sobre las decisiones creativas de la obra. Estaba muy frustrado.",
+        "alibi": "A las 8:40 PM estaba en la cafetería del teatro tomando un café, y luego a las 9:05 PM asistí al ensayo. A las 9:20 PM fui a buscar a la víctima y la encontré muerta en el pasillo.",
+        "suspiciousBehavior": "Sentí que Papito estaba demasiado nervioso después de que encontramos el cuerpo."
+      },
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/women/theater/escene-writer-woman-25-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvd29tZW4vdGhlYXRlci9lc2NlbmUtd3JpdGVyLXdvbWFuLTI1LXllYXJzLW9sZC5qcGciLCJpYXQiOjE3NjAzMTA0NjQsImV4cCI6MTc5MTg0NjQ2NH0.A8ntvauTiUy9iVeALhg-AUGKRsVle77W7JDLhQxVABQ"
+    },
+    {
+      "playerId": "6c6b313d-8766-432e-8511-fe59ccc0db30",
+      "phase1": {
+        "name": "Papito",
+        "occupation": "Director de teatro",
+        "relationshipWithVictim": "Colega y rival profesional en el teatro.",
+        "description": "Soy un director apasionado, enfocado en llevar las actuaciones a otro nivel. A veces, mis métodos son cuestionados por otros.",
+        "gender": "male"
+      },
+      "phase2": {
+        "observations": [
+          "Vi a Lola hablando con la víctima, parecían tener una buena relación, pero también noté que había tensión en el ambiente.",
+          "Noté que Jugador 3 no estaba tan entusiasmada con el proyecto como todos los demás, parecía desinteresada.",
+          "Escuché a la víctima quejarse sobre las decisiones creativas que tomaba yo como director."
+        ]
+      },
+      "phase3": {
+        "timeline": [
+          {
+            "time": "8:40 PM",
+            "location": "Sala de ensayos",
+            "activity": "Estaba discutiendo con la víctima sobre unas escenas de la obra.",
+            "observations": [
+              "Vi a Lola en la cafetería hablando con un grupo, noté que se reían.",
+              "Escuché a Jugador 3 quejarse del vestuario que tenía que usar."
+            ]
+          },
+          {
+            "time": "9:05 PM",
+            "location": "Pasillo del teatro",
+            "activity": "Me dirigía a la sala de dirección.",
+            "observations": [
+              "Vi a Lola en la sala de ensayos, parecía concentrada en su libreta.",
+              "Noté que la víctima estaba nerviosa antes de entrar al ensayo."
+            ]
+          },
+          {
+            "time": "9:20 PM",
+            "location": "Pasillo del teatro (momento del crimen)",
+            "activity": "Estaba acabando de revisar unos papeles cuando escuché un grito.",
+            "observations": [
+              "Vi a Lola correr hacia el pasillo justo después de escuchar el grito.",
+              "Escuché a Jugador 3 preguntando qué había pasado."
+            ]
+          }
+        ]
+      },
+      "phase4": {
+        "isKiller": true,
+        "whySuspicious": "Tuve una discusión acalorada con la víctima sobre su interpretación de mi dirección, estaba frustrado y dolido por sus críticas.",
+        "alibi": "A las 8:40 PM estaba en la sala de ensayos con la víctima discutiendo, luego salí al pasillo. A las 9:20 PM escuché un grito y fui a ver qué había pasado, pero estaba muy involucrado en mis papeles.",
+        "suspiciousBehavior": "Me sentí aliviado de que la obra ya no tuviera que seguir adelante con la víctima como parte del elenco."
+      },
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/men/theater/theater-director-man-55-yearsl-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvbWVuL3RoZWF0ZXIvdGhlYXRlci1kaXJlY3Rvci1tYW4tNTUteWVhcnNsLW9sZC5qcGciLCJpYXQiOjE3NjEzNTU1MTcsImV4cCI6MTc5Mjg5MTUxN30.CmuGkR2-sZa0eIARR3xDjHDNiWdX8qjPU6gByWVzxVU"
+    },
+    {
+      "playerId": "generated-player-2",
+      "phase1": {
+        "name": "Jugador 3",
+        "occupation": "Actriz",
+        "relationshipWithVictim": "Compañera de actuación y amiga, pero a veces competitivas.",
+        "description": "Soy una actriz que lucha por destacarse en el escenario, siempre buscando el papel que me lleve al estrellato.",
+        "gender": "female"
+      },
+      "phase2": {
+        "observations": [
+          "Vi a Papito y la víctima discutiendo, parecía que la tensión era alta entre ellos.",
+          "Noté que Lola se mostraba muy preocupada por la víctima ese día, como si sintiera que algo iba mal.",
+          "Escuché a la víctima mencionar que Papito no estaba a la altura como director en algunos aspectos."
+        ]
+      },
+      "phase3": {
+        "timeline": [
+          {
+            "time": "8:40 PM",
+            "location": "Cafetería del teatro",
+            "activity": "Estaba comiendo algo antes del ensayo.",
+            "observations": [
+              "Vi a Papito molesto hablando con la víctima sobre la obra.",
+              "Escuché a Lola comentar que el guion necesitaba cambios."
+            ]
+          },
+          {
+            "time": "9:05 PM",
+            "location": "Sala de ensayos",
+            "activity": "Estaba ensayando mi parte.",
+            "observations": [
+              "Vi a Papito dirigiendo a los actores, pero la víctima parecía distraída.",
+              "Noté que Lola estaba muy atenta a las instrucciones que daba Papito."
+            ]
+          },
+          {
+            "time": "9:20 PM",
+            "location": "Pasillo del teatro (momento del crimen)",
+            "activity": "Fui a buscar un libro que dejé en el camerino.",
+            "observations": [
+              "Vi a Lola correr hacia donde estaba el grito.",
+              "Escuché a Papito murmurar algo sobre la víctima antes de que todos corrieran."
+            ]
+          }
+        ]
+      },
+      "phase4": {
+        "isKiller": false,
+        "whySuspicious": "Hubo momentos en que fui testigo de cómo Papito criticaba a la víctima y eso me generaba dudas sobre su relación.",
+        "alibi": "A las 8:40 PM estaba en la cafetería del teatro, luego a las 9:05 PM ensayando mi parte en la sala de ensayos, y finalmente fui al pasillo donde escuché el grito al encontrarme con Lola.",
+        "suspiciousBehavior": "Sentí que Papito estaba ansioso y un poco agresivo cuando discutía con la víctima."
+      },
+      "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/suspects_images/women/theater/actress-woman-30-years-old.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJzdXNwZWN0c19pbWFnZXMvd29tZW4vdGhlYXRlci9hY3RyZXNzLXdvbWFuLTMwLXllYXJzLW9sZC5qcGciLCJpYXQiOjE3NjAzMTAyMDUsImV4cCI6MTc5MTg0NjIwNX0.kaKt5cQ4eGSsmdouiyQwHBrWGVAifoITtQ46dV3yYno"
+    }
+  ],
+  "weapon": {
+    "id": "weapon-1",
+    "name": "palo de golf",
+    "description": "Un palo de golf habitual, usado por los pasajeros en el campo de golf del crucero. Presenta manchas de sangre y se considera el arma homicida.",
+    "location": "Encontrado cerca del cuerpo",
+    "photo": "https://inlqqhfwgamrbyrtdqfb.supabase.co/storage/v1/object/sign/weapons/golf.jpg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNDU1Yzg1My1mOTdmLTQwMjctODdlOC1iMjU0NTExODdiZTgiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ3ZWFwb25zL2dvbGYuanBnIiwiaWF0IjoxNzYwNjU3Nzc2LCJleHAiOjE3OTIxOTM3NzZ9.5ll5Px_XSN3Kb5neKEZGIWbRatNb5fa7refM7OvhLJk",
+    "importance": "high"
+  },
+  "hiddenContext": {
+    "killerId": "6c6b313d-8766-432e-8511-fe59ccc0db30",
+    "killerReason": "Papito, el director de teatro, fue rechazado por la víctima, quien despidió su obra más reciente en el crucero. Este desaire lo llevó a un ataque de celos y desesperación, impulsándolo a cometer el asesinato para vengar la humillación pública que sufrió ante los demás pasajeros.",
+    "keyClues": [
+      "Un guion de la obra que Papito escribió, encontrado en la escena del crimen.",
+      "Un collar de perlas que pertenecía a la víctima, descubierto en el camarote de Papito.",
+      "Testimonios de pasajeros que vieron a Papito discutir con la víctima una hora antes del asesinato."
+    ],
+    "killerTraits": [
+      "Manipulador",
+      "Celoso"
+    ]
+  },
+  "config": {
+    "caseType": "asesinato",
+    "totalClues": 8,
+    "scenario": "Crucero de lujo. es un viaje en un crucero de lujo por el Mediterráneo",
+    "customScenario": {
+      "place": "Crucero de lujo",
+      "themeOrSituation": "es un viaje en un crucero de lujo por el Mediterráneo"
+    },
+    "difficulty": "normal"
+  }
+}

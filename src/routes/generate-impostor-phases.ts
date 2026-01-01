@@ -7,6 +7,7 @@ import {
   ImpostorPhasesGenerationRequest,
   ImpostorPhasesResponse,
 } from '../types/multiplayer.js'
+import { CustomScenario, buildCustomScenarioText } from './generate-initial-case.js'
 
 // Lazy initialization - solo crea el cliente cuando se necesite
 let openaiClient: OpenAI | null = null
@@ -206,15 +207,29 @@ async function generatePhasesCaseCore(
     ? '**IDIOMA OBLIGATORIO: ESPAÑOL** - TODO el contenido generado (títulos, descripciones, nombres, etc.) DEBE estar en ESPAÑOL.'
     : '**MANDATORY LANGUAGE: ENGLISH** - ALL generated content (titles, descriptions, names, etc.) MUST be in ENGLISH.'
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Debes crear un caso que se ajuste perfectamente a este escenario personalizado. Usa tu creatividad para adaptar todos los elementos (víctima, ubicación, detalles) a este contexto específico.`
+    : ''
+
   const prompt = language === 'es' ? `
 Genera SOLO el core de un caso de misterio interactivo para juegos multijugador estilo "Among Us" pero narrativo.
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 ${languageInstruction}
 - Quien descubrió el cuerpo: ${playerNames[discoveredByPlayerIndex]} (Player ${discoveredByPlayerIndex + 1})
+${customScenarioDetails}
 
 ${selectedWeapon ? `**ARMA HOMICIDA:**
 - Nombre: ${selectedWeapon.name.es}
@@ -694,15 +709,29 @@ async function generatePhasesHiddenContext(
     ? '**IDIOMA OBLIGATORIO: ESPAÑOL** - TODO el contenido generado DEBE estar en ESPAÑOL.'
     : '**MANDATORY LANGUAGE: ENGLISH** - ALL generated content MUST be in ENGLISH.'
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Las pistas clave y razones del asesino deben estar relacionadas con este escenario personalizado.`
+    : ''
+
   const prompt = language === 'es' ? `
 Genera el contexto oculto (hiddenContext) para un caso de misterio interactivo.
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 ${languageInstruction}
 - Asesino: Player ${randomKillerIndex + 1} (ID: ${killerPlayerId}, Nombre: ${killerPlayer?.phase1?.name || 'Nombre del asesino'})
+${customScenarioDetails}
 
 **JUGADORES:**
 ${allPlayers.map(p => `- ${p.phase1?.name || 'Sin nombre'} (${p.playerId}): ${p.phase1?.occupation || 'Sin ocupación'} - ${p.phase4?.isKiller ? 'ASESINO' : 'INOCENTE'}`).join('\n')}
@@ -777,8 +806,17 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     console.log('Request body:', body)
     
     // Validate required fields
-    if (!body.roomId || !body.caseType || !body.suspects || !body.clues || !body.scenario || !body.difficulty) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    if (!body.roomId || !body.caseType || !body.suspects || !body.clues || !body.difficulty) {
+      return res.status(400).json({ error: 'Missing required fields: roomId, caseType, suspects, clues, difficulty' })
+    }
+
+    // Validar que solo haya scenario o customScenario, no ambos
+    if (body.scenario && body.customScenario) {
+      return res.status(400).json({ error: 'Cannot provide both scenario and customScenario. Provide only one.' })
+    }
+
+    if (!body.scenario && !body.customScenario) {
+      return res.status(400).json({ error: 'Must provide either scenario or customScenario' })
     }
 
     const { language = 'es' } = body
@@ -800,13 +838,25 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     const playerIds = roomPlayers.map((p: Player) => p.id)
 
     // Obtener sospechosos reales desde Supabase
+    // Si hay customScenario, no pasar scene (obtendrá aleatorios)
+    const sceneForService = body.customScenario ? undefined : body.scenario;
+    
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
+    if (body.customScenario) {
+      console.log(`🎨 Custom scenario detected: "${buildCustomScenarioText(body.customScenario)}" - fetching random suspects`);
+      console.log(`   Place: ${body.customScenario.place}`);
+      if (body.customScenario.themeOrSituation) {
+        console.log(`   Theme/Situation: ${body.customScenario.themeOrSituation}`);
+      }
+    } else {
+      console.log(`📍 Fixed scenario: ${body.scenario}`);
+    }
     
     const preferredGenders = playerGenders.filter((g: string) => g !== 'unknown')
     
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
-      scene: body.scenario,
+      scene: sceneForService,
       style: body.style,
       preferredGenders: preferredGenders.length > 0 ? preferredGenders : undefined,
     })
@@ -818,13 +868,14 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
 
     // Seleccionar arma (solo para asesinato)
+    // Si hay customScenario, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null
     if (body.caseType === 'asesinato') {
       console.log(`🔫 Selecting murder weapon...`)
       selectedWeapon = await WeaponService.selectWeapon({
-        scene: body.scenario,
+        scene: sceneForService,
         style: body.style,
-        preferSpecific: true
+        preferSpecific: !body.customScenario, // No preferir específica si es custom
       })
       const weaponName = language === 'es' ? selectedWeapon?.name?.es : selectedWeapon?.name?.en
       console.log(`✅ Selected weapon: ${weaponName}`)
@@ -1091,7 +1142,10 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       config: {
       caseType: body.caseType,
       totalClues: body.clues,
-      scenario: body.scenario,
+      scenario: body.customScenario 
+        ? buildCustomScenarioText(body.customScenario)
+        : (body.scenario || 'aleatorio'),
+      customScenario: body.customScenario || undefined,
       difficulty: body.difficulty,
       },
     }

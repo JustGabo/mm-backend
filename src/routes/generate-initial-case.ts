@@ -26,11 +26,25 @@ function getOpenAIClient(): OpenAI {
 
 export const generateInitialCaseRouter = Router()
 
+export interface CustomScenario {
+  place: string // Lugar del escenario (ej: "jet privado")
+  themeOrSituation?: string // Tema o situación opcional (ej: "es un viaje a otro país por motivo a una fiesta de empleados")
+}
+
+export function buildCustomScenarioText(customScenario: CustomScenario): string {
+  let text = customScenario.place
+  if (customScenario.themeOrSituation) {
+    text += `. ${customScenario.themeOrSituation}`
+  }
+  return text
+}
+
 export interface InitialCaseGenerationRequest {
   caseType: string
   suspects: number
   clues: number
-  scenario: string
+  scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
+  customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
   difficulty: string
   style?: 'realistic' | 'pixel'
   language?: string
@@ -92,6 +106,7 @@ export interface InitialCaseResponse {
     caseType: string
     totalClues: number
     scenario: string
+    customScenario?: CustomScenario
     difficulty: string
   }
 }
@@ -218,7 +233,6 @@ function parseAndRepairJSON(response: string): any {
       if (openBrackets > 0) closing += ']'.repeat(openBrackets)
       
       trimmed = trimmed.substring(0, lastValidPos) + closing
-      console.log(`✅ Reparado: agregado ${closing.length} caracteres de cierre`)
     }
     
     if (!trimmed.endsWith('}')) {
@@ -268,14 +282,28 @@ async function generateCaseCore(
 ): Promise<{ caseTitle: string; caseDescription: string; victim: any; weapon?: any }> {
   const openai = getOpenAIClient()
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Debes crear un caso que se ajuste perfectamente a este escenario personalizado. Usa tu creatividad para adaptar todos los elementos (víctima, ubicación, detalles) a este contexto específico.`
+    : ''
+
   const prompt = `
 Genera SOLO el core de un caso de misterio con la siguiente configuración:
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
+${customScenarioDetails}
 
 ${selectedWeapon ? `**ARMA HOMICIDA:**
 - Nombre: ${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}
@@ -326,7 +354,6 @@ ${request.caseType === 'asesinato' ? `- **causeOfDeath**: Causa de muerte espec�
 **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
 `
 
-  console.log('🤖 Paso 1: Generando core del caso...')
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
@@ -344,7 +371,6 @@ ${request.caseType === 'asesinato' ? `- **causeOfDeath**: Causa de muerte espec�
   const response = completion.choices[0]?.message?.content
   if (!response) throw new Error('No response from OpenAI')
 
-  console.log('✅ Core generado, parseando...')
   return parseAndRepairJSON(response)
 }
 
@@ -366,8 +392,6 @@ async function generateSuspectsBatch(
   
   const batchEnd = Math.min(batchStart + batchSize, request.suspects)
   const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, i) => batchStart + i + 1)
-  
-  console.log(`🤖 Paso 2: Generando sospechosos ${batchStart + 1}-${batchEnd} de ${request.suspects}...`)
   
   const batchSupabaseSuspects = selectedSuspects.slice(batchStart, batchEnd)
   
@@ -404,16 +428,30 @@ ${existingSuspects.map(s => `- ${s.name} (${s.role}): ${s.description || 'Sin de
 \n**IMPORTANTE:** Los nuevos sospechosos deben tener conocimiento de estos sospechosos anteriores y sus relaciones con ellos.`
     : ''
 
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Los sospechosos deben tener roles y ocupaciones que tengan sentido en este escenario personalizado. Adapta sus profesiones, motivos y relaciones al contexto específico proporcionado.`
+    : ''
+
   const prompt = `
 Genera EXACTAMENTE ${batchSize} sospechosos para un caso de misterio.
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Total de sospechosos en el caso: ${request.suspects}
 - Sospechosos a generar en este batch: ${batchStart + 1} a ${batchEnd} (suspect-${batchStart + 1} a suspect-${batchEnd})
+${customScenarioDetails}
 
 **SOSPECHOSOS DE SUPABASE PARA ESTE BATCH:**
 ${suspectsInfo}
@@ -480,7 +518,6 @@ ${batchIndices.includes(randomGuiltyIndex) ? `- ⚠️ **EL CULPABLE OBLIGATORIA
   const response = completion.choices[0]?.message?.content
   if (!response) throw new Error('No response from OpenAI')
 
-  console.log(`✅ Batch ${batchStart + 1}-${batchEnd} generado, parseando...`)
   const parsed = parseAndRepairJSON(response)
   
   if (!parsed.suspects || !Array.isArray(parsed.suspects)) {
@@ -507,15 +544,29 @@ async function generateHiddenContext(
   
   const guiltySuspect = allSuspects.find(s => s.id === `suspect-${randomGuiltyIndex}`)
   
+  // Determinar el escenario a usar
+  const scenarioText = request.customScenario 
+    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+    : `Escenario: ${request.scenario || 'aleatorio'}`
+
+  const customScenarioDetails = request.customScenario
+    ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
+- Lugar: ${request.customScenario.place}
+${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
+
+Las pistas clave y razones del culpable deben estar relacionadas con este escenario personalizado.`
+    : ''
+
   const prompt = `
 Genera el contexto oculto (hiddenContext) para un caso de misterio.
 
 **CONFIGURACIÓN:**
 - Tipo de caso: ${request.caseType}
-- Escenario: ${request.scenario}
+- ${scenarioText}
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Culpable: suspect-${randomGuiltyIndex} (${guiltySuspect?.name || 'Nombre del culpable'})
+${customScenarioDetails}
 
 **SOSPECHOSOS:**
 ${allSuspects.map(s => `- ${s.name} (${s.id}): ${s.role} - ${s.motive || 'Sin motivo'}`).join('\n')}
@@ -533,7 +584,6 @@ ${allSuspects.map(s => `- ${s.name} (${s.id}): ${s.role} - ${s.motive || 'Sin mo
 **RESPONDE CON UN OBJETO JSON VÁLIDO siguiendo el formato del ejemplo anterior.**
 `
 
-  console.log('🤖 Paso 3: Generando hiddenContext...')
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
@@ -551,7 +601,6 @@ ${allSuspects.map(s => `- ${s.name} (${s.id}): ${s.role} - ${s.motive || 'Sin mo
   const response = completion.choices[0]?.message?.content
   if (!response) throw new Error('No response from OpenAI')
 
-  console.log('✅ HiddenContext generado, parseando...')
   const parsed = parseAndRepairJSON(response)
   return parsed.hiddenContext
 }
@@ -569,29 +618,36 @@ async function saveCaseToSupabase(
 ): Promise<string> {
   const supabase = getSupabase()
   
-  console.log('💾 Guardando caso en Supabase...')
-  
   // 1. Insertar caso
-  const { data: caseData, error: caseError } = await supabase
-    .from('cases')
-    .insert({
+  const scenarioValue = request.customScenario 
+    ? buildCustomScenarioText(request.customScenario)
+    : (request.scenario || null)
+  
+  const caseInsert: any = {
       case_title: caseCore.caseTitle,
       case_description: caseCore.caseDescription,
       case_type: request.caseType,
-      scenario: request.scenario,
+      scenario: scenarioValue,
       difficulty: request.difficulty,
       style: request.style || 'realistic',
       language: request.language || 'es',
       suspects_count: request.suspects,
       clues_count: request.clues,
-    })
+    }
+  
+  // Intentar agregar custom_scenario como JSON si existe la columna (no crítico si falla)
+  if (request.customScenario) {
+    caseInsert.custom_scenario = JSON.stringify(request.customScenario)
+  }
+
+  const { data: caseData, error: caseError } = await supabase
+    .from('cases')
+    .insert(caseInsert)
     .select()
     .single()
   
   if (caseError) throw new Error(`Error saving case: ${caseError.message}`)
   const caseId = caseData.id
-  
-  console.log(`✅ Caso guardado con ID: ${caseId}`)
   
   // 2. Insertar víctima
   const { error: victimError } = await supabase
@@ -613,7 +669,6 @@ async function saveCaseToSupabase(
     })
   
   if (victimError) throw new Error(`Error saving victim: ${victimError.message}`)
-  console.log('✅ Víctima guardada')
   
   // 3. Insertar sospechosos
   const guiltyIdStr = `suspect-${hiddenContext.guiltyId?.replace('suspect-', '') || hiddenContext.guiltyId || ''}`
@@ -641,7 +696,6 @@ async function saveCaseToSupabase(
     .insert(suspectsToInsert)
   
   if (suspectsError) throw new Error(`Error saving suspects: ${suspectsError.message}`)
-  console.log(`✅ ${suspects.length} sospechosos guardados`)
   
   // 4. Insertar hiddenContext (opcional - tabla puede no existir)
   if (hiddenContext) {
@@ -658,8 +712,6 @@ async function saveCaseToSupabase(
     
     if (hiddenError) {
       console.warn('⚠️  No se pudo guardar hiddenContext (tabla puede no existir):', hiddenError.message)
-    } else {
-      console.log('✅ HiddenContext guardado')
     }
   }
   
@@ -679,8 +731,6 @@ async function saveCaseToSupabase(
     
     if (weaponError) {
       console.warn('⚠️  No se pudo guardar arma (tabla puede no existir):', weaponError.message)
-    } else {
-      console.log('✅ Arma guardada')
     }
   }
   
@@ -689,14 +739,20 @@ async function saveCaseToSupabase(
 
 generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
   try {
-    console.log('API Route: generate-initial-case called (MULTI-STEP)')
-    
     const body: InitialCaseGenerationRequest = req.body
-    console.log('Request body:', body)
     
     // Validate required fields
-    if (!body.caseType || !body.suspects || !body.clues || !body.scenario || !body.difficulty) {
-      return res.status(400).json({ error: 'Missing required fields' })
+    if (!body.caseType || !body.suspects || !body.clues || !body.difficulty) {
+      return res.status(400).json({ error: 'Missing required fields: caseType, suspects, clues, difficulty' })
+    }
+
+    // Validar que solo haya scenario o customScenario, no ambos
+    if (body.scenario && body.customScenario) {
+      return res.status(400).json({ error: 'Cannot provide both scenario and customScenario. Provide only one.' })
+    }
+
+    if (!body.scenario && !body.customScenario) {
+      return res.status(400).json({ error: 'Must provide either scenario or customScenario' })
     }
 
     const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body
@@ -717,38 +773,33 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
             .filter(Boolean)
 
     // Obtener sospechosos desde Supabase
-    console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
-    console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`)
+    // Si hay customScenario, no pasar scene (obtendrá aleatorios)
+    const sceneForService = body.customScenario ? undefined : body.scenario
 
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
-      scene: body.scenario,
+      scene: sceneForService,
       style: body.style,
       preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
     })
 
-    console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
-
     // Seleccionar arma
+    // Si hay customScenario, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null
     if (body.caseType === 'asesinato') {
-      console.log(`🔫 Selecting murder weapon...`)
       selectedWeapon = await WeaponService.selectWeapon({
-        scene: body.scenario,
+        scene: sceneForService,
         style: body.style,
-        preferSpecific: true,
+        preferSpecific: !body.customScenario, // No preferir específica si es custom
       })
-      console.log(`✅ Selected weapon: ${selectedWeapon?.name?.es}`)
     }
 
     const randomGuiltyIndex = Math.floor(Math.random() * body.suspects) + 1
-    console.log(`🎲 Random guilty suggestion: suspect-${randomGuiltyIndex}`)
 
     // ============================================
     // PASO 1: Generar core del caso
     // ============================================
     const caseCore = await generateCaseCore(body, selectedSuspects, selectedWeapon, language)
-    console.log('✅ Paso 1 completado: Core del caso generado')
 
     // ============================================
     // PASO 2: Generar sospechosos en batches
@@ -769,10 +820,7 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
         Math.min(BATCH_SIZE, body.suspects - batchStart)
       )
       allSuspects.push(...batch)
-      console.log(`✅ Batch ${Math.floor(batchStart / BATCH_SIZE) + 1} completado: ${batch.length} sospechosos generados`)
     }
-    
-    console.log(`✅ Paso 2 completado: ${allSuspects.length} sospechosos generados`)
 
     // Validar número de sospechosos
     if (allSuspects.length !== body.suspects) {
@@ -790,7 +838,6 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
 
     // Matching con Supabase
     if (allSuspects && selectedSuspects) {
-      console.log('🔧 Matching suspects to Supabase photos...')
       const remaining = [...selectedSuspects]
       const usedIds = new Set<string>()
 
@@ -823,7 +870,6 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
         if (best?.id) usedIds.add(best.id)
 
         if (best?.image_url) {
-          console.log(`✅ Matched "${gen.name}" → ${best.occupation?.es}`)
           gen.photo = best.image_url
         }
       })
@@ -840,7 +886,6 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     )
     // Asegurar que guiltyId esté en el formato correcto
     hiddenContext.guiltyId = `suspect-${randomGuiltyIndex}`
-    console.log('✅ Paso 3 completado: HiddenContext generado')
 
     // ============================================
     // Guardar en Supabase
@@ -853,7 +898,6 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       hiddenContext,
       body
     )
-    console.log(`✅ Caso guardado en Supabase con ID: ${caseId}`)
 
     // Construir respuesta
     const response: InitialCaseResponse = {
@@ -870,15 +914,14 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       config: {
         caseType: body.caseType,
         totalClues: body.clues,
-        scenario: body.scenario,
+        scenario: body.customScenario 
+          ? buildCustomScenarioText(body.customScenario)
+          : (body.scenario || 'aleatorio'),
+        customScenario: body.customScenario || undefined,
         difficulty: body.difficulty,
       },
       supabaseSuspects: selectedSuspects,
     }
-
-    console.log('✅ Initial case generated successfully (MULTI-STEP)')
-    console.log(`   Guilty: suspect-${randomGuiltyIndex}`)
-    console.log(`   Suspects: ${allSuspects.length}`)
 
     return res.json(response)
   } catch (error) {
