@@ -476,6 +476,14 @@ ${batchIndices.includes(randomGuiltyIndex) ? `- ⚠️ **EL CULPABLE OBLIGATORIA
    - ⚠️ **LONGITUD EQUILIBRADA:** Todos los motivos deben tener aproximadamente la MISMA LONGITUD (mismo número de palabras/oraciones).
    ${batchIndices.includes(randomGuiltyIndex) ? `- El sospechoso suspect-${randomGuiltyIndex} (el culpable) DEBE tener el motivo MÁS FUERTE en términos de CONTENIDO/CONVICCIÓN, no de longitud.` : ''}
    - Los demás deben tener motivos fuertes pero MENOS CONVINCENTES que el del culpable (misma longitud, menos fuerza en el contenido).
+   - 🚨 **REGLA CRÍTICA - NO REVELAR CULPABILIDAD:**
+     * ❌ NUNCA uses lenguaje que implique acción criminal directa: "decidió eliminar", "llevó a un acto", "cometió el crimen", "realizó el asesinato", "eliminó a", "mató a", etc.
+     * ❌ NUNCA uses frases que confirmen que la persona hizo algo: "lo que la llevó a...", "decidió que...", "actuó para...", etc.
+     * ✅ USA lenguaje que describa SITUACIONES, CONFLICTOS o SENTIMIENTOS: "tenía resentimiento por", "estaba celoso de", "se sintió traicionado por", "había conflicto con", "guardaba rencor hacia", etc.
+     * ✅ Todos los motivos deben ser SUPOSICIONES o EXPLICACIONES DE POR QUÉ PODRÍA ser sospechoso, no confirmaciones de culpabilidad.
+     * ✅ El motivo del culpable debe ser más convincente por la PROFUNDIDAD del conflicto o la INTENSIDAD de las emociones, NO por decir que hizo algo.
+     * ✅ Ejemplos CORRECTOS: "Gabriel tenía celos de la atención que el actor principal recibía, lo que generaba resentimiento hacia él." / "Clara estaba furiosa porque su guion fue rechazado en favor del de la víctima, sintiéndose profundamente traicionada."
+     * ❌ Ejemplos INCORRECTOS: "Clara decidió eliminar a Gabriel" / "lo que la llevó a un acto desesperado" / "decidió eliminar a Gabriel para obtener su puesto"
 
 **FORMATO JSON ESPERADO:**
 {
