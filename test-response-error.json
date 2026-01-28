@@ -1,0 +1,28 @@
+{
+  "status": 500,
+  "statusText": "Internal Server Error",
+  "error": "{\"error\":\"Failed to generate initial case\",\"details\":\"429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\"}",
+  "data": {
+    "error": "Failed to generate initial case",
+    "details": "429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors."
+  },
+  "timestamp": "2026-01-13T18:19:11.609Z",
+  "request": {
+    "caseType": "asesinato",
+    "suspects": 3,
+    "clues": 5,
+    "customScenario": {
+      "place": "Cabaña",
+      "themeOrSituation": "es un viaje en familia a una cabaña en el bosque"
+    },
+    "difficulty": "normal",
+    "style": "realistic",
+    "language": "es",
+    "playerNames": [
+      "Laura"
+    ],
+    "playerGenders": [
+      "female"
+    ]
+  }
+}

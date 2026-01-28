@@ -1041,16 +1041,27 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           ? (orig.occupation?.es || '').toLowerCase()
           : (orig.occupation?.en || '').toLowerCase()
         if (genRole.includes(origRole) || origRole.includes(genRole)) score += 10
-        if (gen.phase1?.gender === orig.gender) score += 5
         return score
       }
 
       allPlayers.forEach((gen) => {
-        let best = null as Suspect | null
-        let bestScore = -1
-        const remaining = selectedSuspects.filter((s: Suspect) => !usedIds.has(s.id))
+        const playerGender = gen.phase1?.gender
+        const remaining = selectedSuspects.filter(s => !usedIds.has(s.id))
         
-        remaining.forEach((orig: Suspect) => {
+        // 🚨 CRÍTICO: PRIMERO filtrar por género - solo considerar sospechosos con el mismo género
+        let genderFiltered = remaining
+        if (playerGender && playerGender !== 'unknown') {
+          genderFiltered = remaining.filter(s => s.gender === playerGender)
+          console.log(`🔍 Filtering suspects for "${gen.phase1?.name}" (gender: ${playerGender}): ${genderFiltered.length} matches out of ${remaining.length}`)
+        }
+        
+        // Si no hay coincidencias de género, usar todos los disponibles (fallback)
+        const candidates = genderFiltered.length > 0 ? genderFiltered : remaining
+        
+        let best = null as any
+        let bestScore = -1
+        
+        candidates.forEach((orig) => {
           if (usedIds.has(orig.id)) return
           const s = scoreMatch(gen, orig)
           if (s > bestScore) {
@@ -1059,19 +1070,33 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           }
         })
 
+        // Si aún no hay match, tomar el primero disponible del género correcto
+        if (!best && genderFiltered.length > 0) {
+          best = genderFiltered.find(o => !usedIds.has(o.id)) || null
+        }
+        
+        // Último fallback: cualquier sospechoso disponible
         if (!best) {
-          best = remaining.find((o: Suspect) => !usedIds.has(o.id)) || null
+          best = remaining.find(o => !usedIds.has(o.id)) || null
         }
 
         if (best?.id) usedIds.add(best.id)
 
         if (best?.image_url) {
           const occupationName = language === 'es' ? best.occupation?.es : best.occupation?.en
-          console.log(`✅ Matched "${gen.phase1?.name}" → ${occupationName}`)
+          const genderMatch = best.gender === playerGender ? '✅' : '⚠️'
+          console.log(`${genderMatch} Matched "${gen.phase1?.name}" (${playerGender}) → ${occupationName} (${best.gender})`)
+          
+          // 🚨 ADVERTENCIA si el género no coincide
+          if (playerGender && playerGender !== 'unknown' && best.gender !== playerGender) {
+            console.warn(`⚠️ WARNING: Gender mismatch for "${gen.phase1?.name}": player is ${playerGender} but suspect is ${best.gender}`)
+          }
+          
           gen.photo = best.image_url
         }
       })
     }
+
 
     // ============================================
     // PASO 3: Generar hiddenContext
