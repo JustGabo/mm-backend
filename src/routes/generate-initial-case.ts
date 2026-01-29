@@ -39,12 +39,30 @@ export function buildCustomScenarioText(customScenario: CustomScenario): string 
   return text
 }
 
+/** Detalles opcionales de la víctima provistos por el usuario. Los campos definidos son CANON. */
+export interface CustomVictim {
+  name?: string
+  gender?: string // ej: 'male' | 'female'
+  age?: number
+  role?: string   // profesión / ocupación
+  description?: string // personalidad o apariencia breve
+  notableTrait?: string // detalle que puede atar al relato (ej: "coleccionista de manuscritos raros")
+}
+
 export interface InitialCaseGenerationRequest {
   caseType: string
   suspects: number
   clues: number
   scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
   customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
+  /**
+   * Contexto narrativo libre provisto por el usuario para "anclar" el caso.
+   * Si se provee, el caso DEBE construirse coherentemente alrededor de este texto
+   * y NO debe contradecirlo. Se permite expandir detalles, pero no cambiar el canon.
+   */
+  customContext?: string
+  /** Detalles opcionales de la víctima. Los campos definidos son CANON y la IA debe usarlos. */
+  customVictim?: CustomVictim
   difficulty: string
   style?: 'realistic' | 'pixel'
   language?: string
@@ -61,6 +79,7 @@ export interface InitialCaseResponse {
     age: number
     role: string
     description: string
+    gender?: string
     causeOfDeath?: string
     timeOfDeath?: string
     timeOfDiscovery?: string
@@ -107,6 +126,8 @@ export interface InitialCaseResponse {
     totalClues: number
     scenario: string
     customScenario?: CustomScenario
+    customContext?: string
+    customVictim?: CustomVictim
     difficulty: string
   }
 }
@@ -295,6 +316,34 @@ ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.custom
 Debes crear un caso que se ajuste perfectamente a este escenario personalizado. Usa tu creatividad para adaptar todos los elementos (víctima, ubicación, detalles) a este contexto específico.`
     : ''
 
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- Debes basar la escena del crimen, víctima, pistas y tono en este contexto.
+- Puedes agregar detalles y conectar elementos, pero sin cambiar hechos explícitos del texto.`
+      : ''
+
+  const customVictimDetails = (() => {
+    const v = request.customVictim
+    if (!v || (Object.keys(v).length === 0)) return ''
+    const lines: string[] = []
+    if (v.name != null && String(v.name).trim()) lines.push(`- **Nombre**: ${String(v.name).trim()}`)
+    if (v.gender != null && String(v.gender).trim()) lines.push(`- **Género**: ${String(v.gender).trim()}`)
+    if (v.age != null && Number(v.age) >= 0) lines.push(`- **Edad**: ${Number(v.age)}`)
+    if (v.role != null && String(v.role).trim()) lines.push(`- **Rol/Profesión**: ${String(v.role).trim()}`)
+    if (v.description != null && String(v.description).trim()) lines.push(`- **Descripción**: ${String(v.description).trim()}`)
+    if (v.notableTrait != null && String(v.notableTrait).trim()) lines.push(`- **Detalle notable** (integrar en la trama): ${String(v.notableTrait).trim()}`)
+    if (lines.length === 0) return ''
+    return `\n**VÍCTIMA PERSONALIZADA (PRIORIDAD - USA EXACTAMENTE ESTOS DATOS):**
+${lines.join('\n')}
+
+La víctima generada DEBE usar estos valores en los campos indicados. No los cambies. Puedes completar el resto (causeOfDeath, location, bodyPosition, etc.) de forma coherente.`
+  })()
+
   const prompt = `
 Genera SOLO el core de un caso de misterio con la siguiente configuración:
 
@@ -304,6 +353,8 @@ Genera SOLO el core de un caso de misterio con la siguiente configuración:
 - Dificultad: ${request.difficulty}
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 ${customScenarioDetails}
+${customContextDetails}
+${customVictimDetails}
 
 ${selectedWeapon ? `**ARMA HOMICIDA:**
 - Nombre: ${language === 'es' ? selectedWeapon.name.es : selectedWeapon.name.en}
@@ -441,6 +492,17 @@ ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.custom
 Los sospechosos deben tener roles y ocupaciones que tengan sentido en este escenario personalizado. Adapta sus profesiones, motivos y relaciones al contexto específico proporcionado.`
     : ''
 
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- Los sospechosos deben encajar naturalmente en este contexto (roles, oportunidades, relaciones).
+- Puedes expandir con detalles coherentes, sin inventar hechos que contradigan el texto.`
+      : ''
+
   const prompt = `
 Genera EXACTAMENTE ${batchSize} sospechosos para un caso de misterio.
 
@@ -452,6 +514,7 @@ Genera EXACTAMENTE ${batchSize} sospechosos para un caso de misterio.
 - Total de sospechosos en el caso: ${request.suspects}
 - Sospechosos a generar en este batch: ${batchStart + 1} a ${batchEnd} (suspect-${batchStart + 1} a suspect-${batchEnd})
 ${customScenarioDetails}
+${customContextDetails}
 
 **SOSPECHOSOS DE SUPABASE PARA ESTE BATCH:**
 ${suspectsInfo}
@@ -565,6 +628,17 @@ ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.custom
 Las pistas clave y razones del culpable deben estar relacionadas con este escenario personalizado.`
     : ''
 
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- El guiltyReason y las keyClues deben estar conectados a detalles del contexto (objetos, horarios, restricciones, etc.).
+- Puedes inferir y expandir, pero no cambiar hechos explícitos del texto.`
+      : ''
+
   const prompt = `
 Genera el contexto oculto (hiddenContext) para un caso de misterio.
 
@@ -575,6 +649,7 @@ Genera el contexto oculto (hiddenContext) para un caso de misterio.
 - Idioma: ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}
 - Culpable: suspect-${randomGuiltyIndex} (${guiltySuspect?.name || 'Nombre del culpable'})
 ${customScenarioDetails}
+${customContextDetails}
 
 **SOSPECHOSOS:**
 ${allSuspects.map(s => `- ${s.name} (${s.id}): ${s.role} - ${s.motive || 'Sin motivo'}`).join('\n')}
@@ -809,6 +884,16 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     // ============================================
     const caseCore = await generateCaseCore(body, selectedSuspects, selectedWeapon, language)
 
+    // Aplicar customVictim sobre la víctima generada (prioridad al input del usuario)
+    if (body.customVictim && caseCore.victim) {
+      const v = body.customVictim
+      if (v.name != null && String(v.name).trim()) caseCore.victim.name = String(v.name).trim()
+      if (v.gender != null && String(v.gender).trim()) caseCore.victim.gender = String(v.gender).trim()
+      if (v.age != null && Number(v.age) >= 0) caseCore.victim.age = Number(v.age)
+      if (v.role != null && String(v.role).trim()) caseCore.victim.role = String(v.role).trim()
+      if (v.description != null && String(v.description).trim()) caseCore.victim.description = String(v.description).trim()
+    }
+
     // ============================================
     // PASO 2: Generar sospechosos en batches
     // ============================================
@@ -840,6 +925,32 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       allSuspects.forEach((s, i) => {
         if (playerNames[i]) {
           s.name = playerNames[i]
+        }
+      })
+    }
+
+    // Normalizar y aplicar géneros de jugadores (si se proporcionan)
+    function normalizeGender(input: any): string | undefined {
+      if (input == null) return undefined
+      const g = String(input).toLowerCase().trim()
+      if (!g) return undefined
+      if (g === 'male' || g === 'm' || g === 'hombre' || g === 'man') return 'male'
+      if (g === 'female' || g === 'f' || g === 'mujer' || g === 'woman') return 'female'
+      if (g === 'unknown' || g === 'desconocido' || g === 'otro' || g === 'other') return 'unknown'
+      return g
+    }
+
+    if (allSuspects) {
+      allSuspects.forEach((s, i) => {
+        // Primero: si el cliente mandó género para ese índice, tiene prioridad
+        const provided = playerGenders[i]
+        if (provided) {
+          s.gender = normalizeGender(provided)
+          return
+        }
+        // Si no, normalizar el que devolvió la IA (por si vino como "mujer/hombre")
+        if (s.gender) {
+          s.gender = normalizeGender(s.gender)
         }
       })
     }
@@ -926,6 +1037,8 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
           ? buildCustomScenarioText(body.customScenario)
           : (body.scenario || 'aleatorio'),
         customScenario: body.customScenario || undefined,
+        customContext: body.customContext?.trim() || undefined,
+        customVictim: body.customVictim || undefined,
         difficulty: body.difficulty,
       },
       supabaseSuspects: selectedSuspects,

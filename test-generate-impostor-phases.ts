@@ -109,15 +109,26 @@ async function testGenerateImpostorPhases() {
       console.log(`⚠️  Nota: Si hay menos jugadores en la sala, el endpoint generará nombres para los adicionales`)
     }
 
+    // Probar con customContext como canon del escenario (modo impostor)
     testData = {
       roomId: testRoomId,
       caseType: 'asesinato',
       suspects: suspectsCount,
       clues: 8,
-      customScenario: {
-        place: 'Crucero de lujo',
-        themeOrSituation: 'es un viaje en un crucero de lujo por el Mediterráneo'
-      },
+      customContext: `Biblioteca del hotel. El cadáver está en la biblioteca del hotel, una habitación rectangular con estanterías de madera oscura hasta el techo. Una chimenea apagada ocupa una pared. Hay dos sillones, una mesa baja y un escritorio antiguo junto a la ventana. La víctima es León Ferrer, 54 años, empresario cultural y dueño de una valiosa colección privada de manuscritos antiguos. Estaba hospedado en la habitación 6, pero fue hallado aquí.
+
+🩸 El cuerpo
+León Ferrer yace en el suelo, de costado, cerca del escritorio. No hay señales de lucha violenta. No hay sangre visible en exceso. La causa de muerte aún no es oficial, pero a simple vista no parece un disparo ni una puñalada. Su rostro está relajado… casi como si no hubiera anticipado lo que ocurrió. En su mano derecha sostiene un botón oscuro, suelto, sin hilo.
+
+🕰️ Detalles importantes del entorno
+El reloj de pared de la biblioteca está detenido en 11:20 p.m.
+Una taza de té frío está sobre el escritorio.
+La ventana está cerrada por dentro.
+La puerta no estaba con llave cuando se encontró el cuerpo.
+No hay signos de robo inmediato: su reloj y su billetera siguen con él.
+
+🏨 Quiénes estaban en el hotel anoche
+Además de la víctima y ustedes (los jugadores), solo había cuatro personas más en el hotel durante la noche: el dueño del hotel, una huésped habitual, un empleado, y una persona que llegó el mismo día que León. Todos estaban presentes cuando el cuerpo fue descubierto. Nadie abandonó el hotel. Nadie pudo entrar ni salir.`,
       difficulty: 'normal',
       style: 'realistic' as const,
       language: 'es' // Español
@@ -303,6 +314,26 @@ async function testGenerateImpostorPhases() {
         throw new Error(`❌ scenario no coincide: esperado "${testData.scenario}", recibido "${data.config?.scenario}"`)
       }
       console.log(`   ✅ Scenario válido: "${data.config.scenario}"`)
+    }
+
+    // 10. Validar customContext si está presente
+    if (testData.customContext) {
+      if (!data.config?.customContext) {
+        throw new Error('❌ customContext no está en la respuesta')
+      }
+      if (data.config.customContext.trim() !== testData.customContext.trim()) {
+        throw new Error('❌ customContext no coincide con el enviado')
+      }
+      console.log(`   ✅ Custom context válido (devuelto en config)`)
+      // Verificación suave: que la víctima o el caso reflejen el contexto (biblioteca, León Ferrer, etc.)
+      const victimName = (data.victim?.name || '').toLowerCase()
+      const caseDesc = (data.caseDescription || '').toLowerCase()
+      const caseTitle = (data.caseTitle || '').toLowerCase()
+      if (victimName.includes('león') || victimName.includes('leon') || caseDesc.includes('biblioteca') || caseDesc.includes('hotel') || caseTitle.includes('biblioteca') || caseTitle.includes('hotel')) {
+        console.log(`   ✅ Caso coherente con customContext (víctima/ubicación mencionados)`)
+      } else {
+        console.log(`   ℹ️  Caso generado; revisar test-impostor-phases-response.json para coherencia con customContext`)
+      }
     }
 
     // Resumen
