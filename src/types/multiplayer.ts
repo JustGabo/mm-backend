@@ -1,4 +1,4 @@
-import { CustomScenario } from '../routes/generate-initial-case.js'
+import { CustomScenario, CustomVictim } from '../routes/generate-initial-case.js'
 
 export interface ImpostorPhasesGenerationRequest {
     roomId: string
@@ -7,6 +7,14 @@ export interface ImpostorPhasesGenerationRequest {
     clues: number
     scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
     customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
+    /**
+     * Contexto narrativo libre provisto por el usuario para "anclar" el caso.
+     * Si se provee, el caso DEBE construirse coherentemente alrededor de este texto
+     * y NO debe contradecirlo. Se permite expandir detalles, pero no cambiar el canon.
+     */
+    customContext?: string
+    /** Detalles opcionales de la víctima. Los campos definidos son CANON. */
+    customVictim?: CustomVictim
     difficulty: string
     style?: 'realistic' | 'pixel'
     language?: string
@@ -49,6 +57,7 @@ export interface ImpostorPhasesGenerationRequest {
       age: number
       role: string
       description: string
+      gender?: string
       causeOfDeath?: string
       timeOfDeath?: string
       timeOfDiscovery?: string
@@ -79,6 +88,8 @@ export interface ImpostorPhasesGenerationRequest {
       totalClues: number
       scenario: string
       customScenario?: CustomScenario
+      customContext?: string
+      customVictim?: CustomVictim
       difficulty: string
     }
   }

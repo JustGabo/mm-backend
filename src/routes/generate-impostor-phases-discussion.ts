@@ -306,12 +306,25 @@ ${historyInfo}
 ${historySummary}
 
 **ESTRUCTURA DE RONDAS:**
-- RONDA 1 (roundNumber 1): Preguntar el motivo - Genera preguntas (tipo "question") para que los jugadores expliquen sus motivos de sospecha y por qué podrían ser sospechosos. Pregunta a MÚLTIPLES jugadores (mínimo 3-4) sobre sus motivos. NO hagas focus en un solo jugador, especialmente NO en el culpable.
-- RONDA 2 (roundNumber 2): Decir las coartadas - Genera preguntas (tipo "question") para que los jugadores expliquen sus coartadas y dónde estaban durante el evento. Pregunta a MÚLTIPLES jugadores (mínimo 3-4) sobre sus coartadas. NO hagas focus en un solo jugador.
-- RONDA 3 (roundNumber 3): Primer descubrimiento - Genera un descubrimiento/pista NUEVA (tipo "discovery") descubierta por la investigación. Debe ser evidencia objetiva que pueda inculpar a varios jugadores. Ejemplos: "Se encontraron huellas en [lugar]", "El análisis forense revela...", "Los registros muestran...". Varía los tipos de evidencia: forense, tecnológica, testimonial, física, etc. ${historySummary.includes('huellas') ? '**NO menciones huellas dactilares, ya se habló de eso anteriormente.**' : ''}
-- RONDA 4 (roundNumber 4): Segundo descubrimiento - Genera OTRO descubrimiento/pista NUEVA (tipo "discovery"), DIFERENTE al de la RONDA 3. Continúa revelando evidencia objetiva. ${historySummary.includes('huellas') || historySummary.includes('dna') ? '**NO repitas el mismo tipo de evidencia (huellas, DNA, etc.) ya mencionado.**' : ''}
-- RONDA 5 (roundNumber 5): Tercer descubrimiento o contradicción - Genera otro descubrimiento NUEVO (tipo "discovery") O señala una contradicción (tipo "inconsistency"), pero SIEMPRE mencionando a MÚLTIPLES jugadores (mínimo 3-4). ${historySummary.includes('huellas') || historySummary.includes('dna') || historySummary.includes('cámaras') ? '**NO repitas tipos de evidencia ya mencionados.**' : ''}
-- RONDA 6 (roundNumber 6): Análisis final y presión - Haz preguntas generales (tipo "question") o señala contradicciones finales (tipo "inconsistency") que inviten a reflexionar sobre todo lo descubierto. Que generen debates entre TODOS los sospechosos sin hacer focus en uno solo.
+- RONDA 1 (roundNumber 1): Motivo de sospecha - MOCKEADA (no se genera aquí)
+- RONDA 2 (roundNumber 2): Coartadas oficiales - MOCKEADA (no se genera aquí)
+- RONDA 3 (roundNumber 3): Observaciones sospechosas - Genera una pregunta (tipo "question") que invite a cada jugador a compartir sus observaciones sospechosas sobre otros jugadores. Los jugadores pueden responder basándose en la información de su ficha (especialmente en "OBSERVACIONES SOSPECHOSAS" del additionalContext). La pregunta debe ser CONCRETA y permitir que cada jugador exprese lo que observó, NO preguntes sobre sentimientos, emociones, o influencias subjetivas. Ejemplo CORRECTO: "Cada uno de ustedes debe compartir qué observaciones sospechosas notó sobre otros jugadores durante la noche del crimen. ¿Qué comportamientos, movimientos, o acciones les parecieron extraños?" Ejemplo INCORRECTO: "¿Cómo creen que estas tensiones pudieron haber influido en sus comportamientos?" o "¿Cómo se sintieron al respecto?" - estas preguntas son demasiado subjetivas y no tienen sentido.
+- RONDA 4 (roundNumber 4): Evidencias generadas - Genera descubrimientos/pistas lógicas basadas en las fichas de los jugadores, como las coartadas, los motivos
+- RONDA 5 (roundNumber 5): Contradicciones directas - Compara lo que dijeron diferentes jugadores y señala contradicciones (ej: "La coartada de Carlos dice que vio la luz encendida, pero Ana dice que estaba todo oscuro. ¿Quién está mintiendo?")
+- RONDA 6 (roundNumber 6): Presión final - Haz preguntas CONCRETAS que generen debates entre sospechosos basadas en información REAL de las fichas. NO hagas preguntas subjetivas sobre sentimientos, emociones, o influencias. Enfócate en preguntas que los jugadores puedan responder con información concreta de sus fichas.
+
+**CRÍTICO - CONSISTENCIA EN LOS DETALLES DE LOS JUGADORES:**
+- **EVITA contradicciones en los detalles de los jugadores** (nombres, roles, ubicaciones, actividades, relaciones) a menos que sean INTENCIONALES para inculpar sutilmente al verdadero culpable
+- **Si mencionas información sobre un jugador, DEBE ser consistente con su ficha:**
+  * Si un jugador se llama "Carlos" en su ficha, NO lo llames "Juan" en otra parte
+  * Si un jugador es "chef" en su ficha, NO lo llames "médico" en otra parte
+  * Si un jugador estaba en "cocina" según su coartada, NO digas que estaba en "biblioteca" a menos que sea una contradicción INTENCIONAL para inculpar sutilmente
+- **Las ÚNICAS contradicciones permitidas son aquellas que:**
+  * Están diseñadas para inculpar SUTILMENTE al verdadero culpable (el asesino)
+  * Son parte de la estrategia del juego para hacer que el culpable sea descubierto de manera natural
+  * NO son errores accidentales o inconsistencias que confundan a los jugadores
+- **Ejemplo CORRECTO de contradicción intencional:** Si el culpable dice que estaba en la cocina pero hay evidencia de que alguien con sus características estaba en otro lugar, puedes mencionar esta contradicción sutilmente
+- **Ejemplo INCORRECTO:** Mencionar que "Carlos" estaba en la biblioteca cuando su ficha claramente dice que estaba en la cocina, sin ninguna razón estratégica
 
 **TIPOS DE INTERVENCIONES DEL DETECTIVE:**
 1. **PREGUNTA (type: "question")**: Hacer una pregunta directa a los jugadores
@@ -340,6 +353,47 @@ ${historySummary}
     "implications": ["Implicación 1", "Implicación 2"]
   }
 }
+
+
+**REGLAS PARA LA INTERVENCIÓN SEGÚN LA FASE:**
+1. **FASE 3 (roundNumber 3) - Observaciones sospechosas:**
+   - Tipo: "question"
+   - **🚨 CRÍTICO: Esta ronda es ESPECÍFICAMENTE para que los jugadores compartan sus observaciones sospechosas basándose en la información de sus fichas**
+   - Genera una pregunta CONCRETA que invite a cada jugador a compartir qué observó sobre otros jugadores
+   - Los jugadores pueden responder basándose en la sección "OBSERVACIONES SOSPECHOSAS" de su additionalContext
+   - **CRÍTICO: NO hagas preguntas subjetivas sobre sentimientos, emociones, o influencias (ej: "¿cómo creen que estas tensiones pudieron haber influido?" o "¿cómo se sintieron?") - estas preguntas no tienen sentido y pueden llevar a contradicciones**
+   - **CRÍTICO: NO preguntes sobre tiempos, ubicaciones, o coartadas porque eso ya se cubrió en la ronda 2**
+   - La pregunta debe permitir que cada jugador exprese CONCRETAMENTE lo que observó, basándose en su información
+   - Ejemplo CORRECTO: "Cada uno de ustedes debe compartir qué observaciones sospechosas notó sobre otros jugadores durante la noche del crimen. ¿Qué comportamientos, movimientos, conversaciones, o acciones les parecieron extrañas o sospechosas?"
+   - Ejemplo CORRECTO: "Basándose en lo que observaron durante la noche, ¿qué comportamientos o acciones de otros jugadores les llamaron la atención como sospechosos?"
+   - Ejemplo INCORRECTO: "¿Cómo creen que estas tensiones pudieron haber influido en sus comportamientos durante la noche del crimen?" (demasiado subjetivo, no tiene sentido)
+   - Ejemplo INCORRECTO: "¿Cómo se sintieron al respecto?" (demasiado vago y subjetivo)
+
+2. **FASE 4 (roundNumber 4) - Evidencias generadas:**
+   - Tipo: "discovery"
+   - Genera descubrimientos/pistas lógicas basadas en las fichas de los jugadores, como las coartadas, los motivos
+   - **🚨 CRÍTICO - BASARSE SOLO EN INFORMACIÓN REAL:**
+     * NUNCA inventes información que no esté en las fichas de los jugadores
+     * Analiza el "additionalContext" de TODOS los jugadores para encontrar conexiones reales
+     * Si mencionas algo sobre un jugador, DEBE estar explícitamente en su ficha
+   - **CRÍTICO: El descubrimiento debe tener IDENTIFICADORES que inculpen a jugadores específicos basados en información REAL de sus fichas**
+   - **CRÍTICO: Si mencionas información de un jugador, usa frases como "[jugador] nos ha confesado que..." o "Hemos descubierto que [jugador] mencionó en su coartada que..." para que sea claro que esa información vino del jugador**
+   - **CRÍTICO: NUNCA digas "esto plantea dudas", "esto contradice", "esto pone en duda" o frases similares. Solo presenta el dato objetivo y deja que los jugadores se den cuenta**
+
+3. **FASE 5 (roundNumber 5) - Contradicciones directas:**
+   - Tipo: "inconsistency"
+   - Compara lo que dijeron diferentes jugadores y señala contradicciones usando EVIDENCIA OBJETIVA basada SOLO en información REAL de las fichas
+   - **CRÍTICO: Las inconsistencias deben ser basadas en OBJETOS DEJADOS EN LA ESCENA, PISTAS FÍSICAS, o información REAL de las fichas que los jugadores puedan relacionar con las coartadas**
+   - **CRÍTICO: NUNCA asumas cosas que los jugadores no dijeron explícitamente. Solo puedes usar información de las FICHAS: coartadas (alibi, whereWas, whatDid), motivos (whySuspicious), comportamientos sospechosos (suspiciousBehavior), y contexto adicional (additionalContext)**
+   - **CRÍTICO: Si mencionas algo que un jugador dijo, usa frases como "[jugador] nos ha confesado que..." o "Según lo que [jugador] mencionó en su coartada..." para que sea claro que esa información vino del jugador**
+   - **CRÍTICO: NUNCA digas "esto plantea dudas", "esto contradice", "esto pone en duda" o frases similares. Solo presenta el dato objetivo.**
+
+4. **FASE 6 (roundNumber 6) - Presión final:**
+   - Tipo: "question"
+   - Haz preguntas CONCRETAS que generen debates entre sospechosos basadas en información REAL de las fichas
+   - **CRÍTICO: NO hagas preguntas subjetivas sobre sentimientos, emociones, o influencias. Enfócate en preguntas que los jugadores puedan responder con información concreta de sus fichas**
+   - La pregunta debe permitir que todos los jugadores participen y reflexionen sobre todo lo descubierto
+
 
 **CRÍTICO:**
 - El contenido debe estar en ${language === 'es' ? 'ESPAÑOL' : 'INGLÉS'}

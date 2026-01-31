@@ -7,7 +7,7 @@ import {
   ImpostorPhasesGenerationRequest,
   ImpostorPhasesResponse,
 } from '../types/multiplayer.js'
-import { CustomScenario, buildCustomScenarioText } from './generate-initial-case.js'
+import { CustomScenario, CustomVictim, buildCustomScenarioText } from './generate-initial-case.js'
 
 // Lazy initialization - solo crea el cliente cuando se necesite
 let openaiClient: OpenAI | null = null
@@ -208,17 +208,48 @@ async function generatePhasesCaseCore(
     : '**MANDATORY LANGUAGE: ENGLISH** - ALL generated content (titles, descriptions, names, etc.) MUST be in ENGLISH.'
   
   // Determinar el escenario a usar
-  const scenarioText = request.customScenario 
-    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
-    : `Escenario: ${request.scenario || 'aleatorio'}`
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioText = hasCustomContext
+    ? `Escenario: DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO`
+    : request.customScenario 
+      ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+      : `Escenario: ${request.scenario || 'aleatorio'}`
 
-  const customScenarioDetails = request.customScenario
+  const customScenarioDetails = !hasCustomContext && request.customScenario
     ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
 - Lugar: ${request.customScenario.place}
 ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
 
 Debes crear un caso que se ajuste perfectamente a este escenario personalizado. Usa tu creatividad para adaptar todos los elementos (víctima, ubicación, detalles) a este contexto específico.`
     : ''
+
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- Debes basar la escena del crimen, víctima, pistas y tono en este contexto.
+- Puedes agregar detalles y conectar elementos, pero sin cambiar hechos explícitos del texto.`
+      : ''
+
+  const customVictimDetails = (() => {
+    const v = request.customVictim
+    if (!v || (Object.keys(v).length === 0)) return ''
+    const lines: string[] = []
+    if (v.name != null && String(v.name).trim()) lines.push(`- **Nombre**: ${String(v.name).trim()}`)
+    if (v.gender != null && String(v.gender).trim()) lines.push(`- **Género**: ${String(v.gender).trim()}`)
+    if (v.age != null && Number(v.age) >= 0) lines.push(`- **Edad**: ${Number(v.age)}`)
+    if (v.role != null && String(v.role).trim()) lines.push(`- **Rol/Profesión**: ${String(v.role).trim()}`)
+    if (v.description != null && String(v.description).trim()) lines.push(`- **Descripción**: ${String(v.description).trim()}`)
+    if (v.notableTrait != null && String(v.notableTrait).trim()) lines.push(`- **Detalle notable** (integrar en la trama): ${String(v.notableTrait).trim()}`)
+    if (lines.length === 0) return ''
+    return `\n**VÍCTIMA PERSONALIZADA (PRIORIDAD - USA EXACTAMENTE ESTOS DATOS):**
+${lines.join('\n')}
+
+La víctima generada DEBE usar estos valores en los campos indicados. No los cambies. Puedes completar el resto (causeOfDeath, location, bodyPosition, etc.) de forma coherente.`
+  })()
 
   const prompt = language === 'es' ? `
 Genera SOLO el core de un caso de misterio interactivo para juegos multijugador estilo "Among Us" pero narrativo.
@@ -230,6 +261,8 @@ Genera SOLO el core de un caso de misterio interactivo para juegos multijugador 
 ${languageInstruction}
 - Quien descubrió el cuerpo: ${playerNames[discoveredByPlayerIndex]} (Player ${discoveredByPlayerIndex + 1})
 ${customScenarioDetails}
+${customContextDetails}
+${customVictimDetails}
 
 ${selectedWeapon ? `**ARMA HOMICIDA:**
 - Nombre: ${selectedWeapon.name.es}
@@ -501,12 +534,31 @@ function createPlayersPhasesBatchPrompt(
     ? '**IDIOMA OBLIGATORIO: ESPAÑOL** - TODO el contenido generado DEBE estar en ESPAÑOL. Nombres, descripciones, observaciones, timelines, alibis, TODO.'
     : '**MANDATORY LANGUAGE: ENGLISH** - ALL generated content MUST be in ENGLISH. Names, descriptions, observations, timelines, alibis, EVERYTHING.'
 
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioForPrompt = hasCustomContext
+    ? 'escenario definido por el contexto personalizado del usuario'
+    : request.customScenario
+      ? buildCustomScenarioText(request.customScenario)
+      : request.scenario || 'aleatorio'
+
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- Los jugadores deben encajar naturalmente en este contexto (roles, oportunidades, relaciones).
+- Puedes expandir con detalles coherentes, sin inventar hechos que contradigan el texto.`
+      : ''
+
   return `You are an expert in creating interactive mystery cases for multiplayer games like "Among Us" but narrative.
 
 **CONTEXT:**
-You are creating a ${caseTypeText} case for ${request.suspects} players in a ${request.scenario} scenario.
+You are creating a ${caseTypeText} case for ${request.suspects} players in a ${scenarioForPrompt} scenario.
 Difficulty: ${difficultyText}
 ${languageInstruction}
+${customContextDetails}
 ${language === 'es' ? `Jugadores a generar en este batch: ${batchStart + 1} a ${batchEnd} (${batchIndices.map(i => `Player ${i + 1}`).join(', ')})
 
 **SOSPECHOSOS DISPONIBLES PARA ESTE BATCH:**` : `Players to generate in this batch: ${batchStart + 1} to ${batchEnd} (${batchIndices.map(i => `Player ${i + 1}`).join(', ')})
@@ -710,17 +762,31 @@ async function generatePhasesHiddenContext(
     : '**MANDATORY LANGUAGE: ENGLISH** - ALL generated content MUST be in ENGLISH.'
   
   // Determinar el escenario a usar
-  const scenarioText = request.customScenario 
-    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
-    : `Escenario: ${request.scenario || 'aleatorio'}`
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioText = hasCustomContext
+    ? `Escenario: DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO`
+    : request.customScenario 
+      ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+      : `Escenario: ${request.scenario || 'aleatorio'}`
 
-  const customScenarioDetails = request.customScenario
+  const customScenarioDetails = !hasCustomContext && request.customScenario
     ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
 - Lugar: ${request.customScenario.place}
 ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
 
 Las pistas clave y razones del asesino deben estar relacionadas con este escenario personalizado.`
     : ''
+
+  const customContextDetails =
+    request.customContext && request.customContext.trim().length > 0
+      ? `\n**CONTEXTO PERSONALIZADO DEL USUARIO (PRIORIDAD ABSOLUTA):**
+${request.customContext.trim()}
+
+REGLAS:
+- Este texto es CANON. NO lo contradigas.
+- El killerReason y las keyClues deben estar conectados a detalles del contexto (objetos, horarios, restricciones, etc.).
+- Puedes inferir y expandir, pero no cambiar hechos explícitos del texto.`
+      : ''
 
   const prompt = language === 'es' ? `
 Genera el contexto oculto (hiddenContext) para un caso de misterio interactivo.
@@ -732,6 +798,7 @@ Genera el contexto oculto (hiddenContext) para un caso de misterio interactivo.
 ${languageInstruction}
 - Asesino: Player ${randomKillerIndex + 1} (ID: ${killerPlayerId}, Nombre: ${killerPlayer?.phase1?.name || 'Nombre del asesino'})
 ${customScenarioDetails}
+${customContextDetails}
 
 **JUGADORES:**
 ${allPlayers.map(p => `- ${p.phase1?.name || 'Sin nombre'} (${p.playerId}): ${p.phase1?.occupation || 'Sin ocupación'} - ${p.phase4?.isKiller ? 'ASESINO' : 'INOCENTE'}`).join('\n')}
@@ -810,13 +877,16 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       return res.status(400).json({ error: 'Missing required fields: roomId, caseType, suspects, clues, difficulty' })
     }
 
-    // Validar que solo haya scenario o customScenario, no ambos
-    if (body.scenario && body.customScenario) {
+    const hasCustomContext = Boolean(body.customContext && body.customContext.trim().length > 0)
+
+    // Validar que solo haya scenario o customScenario (si NO hay customContext)
+    if (!hasCustomContext && body.scenario && body.customScenario) {
       return res.status(400).json({ error: 'Cannot provide both scenario and customScenario. Provide only one.' })
     }
 
-    if (!body.scenario && !body.customScenario) {
-      return res.status(400).json({ error: 'Must provide either scenario or customScenario' })
+    // Si hay customContext, puede venir sin scenario/customScenario
+    if (!hasCustomContext && !body.scenario && !body.customScenario) {
+      return res.status(400).json({ error: 'Must provide either scenario, customScenario, or customContext' })
     }
 
     const { language = 'es' } = body
@@ -838,11 +908,13 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     const playerIds = roomPlayers.map((p: Player) => p.id)
 
     // Obtener sospechosos reales desde Supabase
-    // Si hay customScenario, no pasar scene (obtendrá aleatorios)
-    const sceneForService = body.customScenario ? undefined : body.scenario;
+    // Si hay customScenario o customContext, no pasar scene (obtendrá aleatorios)
+    const sceneForService = (hasCustomContext || body.customScenario) ? undefined : body.scenario;
     
     console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
-    if (body.customScenario) {
+    if (hasCustomContext) {
+      console.log(`📝 Custom context detected - fetching random suspects`);
+    } else if (body.customScenario) {
       console.log(`🎨 Custom scenario detected: "${buildCustomScenarioText(body.customScenario)}" - fetching random suspects`);
       console.log(`   Place: ${body.customScenario.place}`);
       if (body.customScenario.themeOrSituation) {
@@ -875,7 +947,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       selectedWeapon = await WeaponService.selectWeapon({
         scene: sceneForService,
         style: body.style,
-        preferSpecific: !body.customScenario, // No preferir específica si es custom
+        preferSpecific: !(hasCustomContext || body.customScenario), // No preferir específica si es custom
       })
       const weaponName = language === 'es' ? selectedWeapon?.name?.es : selectedWeapon?.name?.en
       console.log(`✅ Selected weapon: ${weaponName}`)
@@ -927,6 +999,16 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       allPlayerNames // Usar allPlayerNames en lugar de playerNames
     )
     console.log('✅ Paso 1 completado: Core del caso generado')
+
+    // Aplicar customVictim sobre la víctima generada (prioridad al input del usuario)
+    if (body.customVictim && caseCore.victim) {
+      const v = body.customVictim
+      if (v.name != null && String(v.name).trim()) caseCore.victim.name = String(v.name).trim()
+      if (v.gender != null && String(v.gender).trim()) caseCore.victim.gender = String(v.gender).trim()
+      if (v.age != null && Number(v.age) >= 0) caseCore.victim.age = Number(v.age)
+      if (v.role != null && String(v.role).trim()) caseCore.victim.role = String(v.role).trim()
+      if (v.description != null && String(v.description).trim()) caseCore.victim.description = String(v.description).trim()
+    }
 
     // ============================================
     // PASO 2: Generar jugadores con fases en batches
@@ -1041,16 +1123,27 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           ? (orig.occupation?.es || '').toLowerCase()
           : (orig.occupation?.en || '').toLowerCase()
         if (genRole.includes(origRole) || origRole.includes(genRole)) score += 10
-        if (gen.phase1?.gender === orig.gender) score += 5
         return score
       }
 
       allPlayers.forEach((gen) => {
-        let best = null as Suspect | null
-        let bestScore = -1
-        const remaining = selectedSuspects.filter((s: Suspect) => !usedIds.has(s.id))
+        const playerGender = gen.phase1?.gender
+        const remaining = selectedSuspects.filter(s => !usedIds.has(s.id))
         
-        remaining.forEach((orig: Suspect) => {
+        // 🚨 CRÍTICO: PRIMERO filtrar por género - solo considerar sospechosos con el mismo género
+        let genderFiltered = remaining
+        if (playerGender && playerGender !== 'unknown') {
+          genderFiltered = remaining.filter(s => s.gender === playerGender)
+          console.log(`🔍 Filtering suspects for "${gen.phase1?.name}" (gender: ${playerGender}): ${genderFiltered.length} matches out of ${remaining.length}`)
+        }
+        
+        // Si no hay coincidencias de género, usar todos los disponibles (fallback)
+        const candidates = genderFiltered.length > 0 ? genderFiltered : remaining
+        
+        let best = null as any
+        let bestScore = -1
+        
+        candidates.forEach((orig) => {
           if (usedIds.has(orig.id)) return
           const s = scoreMatch(gen, orig)
           if (s > bestScore) {
@@ -1059,19 +1152,33 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           }
         })
 
+        // Si aún no hay match, tomar el primero disponible del género correcto
+        if (!best && genderFiltered.length > 0) {
+          best = genderFiltered.find(o => !usedIds.has(o.id)) || null
+        }
+        
+        // Último fallback: cualquier sospechoso disponible
         if (!best) {
-          best = remaining.find((o: Suspect) => !usedIds.has(o.id)) || null
+          best = remaining.find(o => !usedIds.has(o.id)) || null
         }
 
         if (best?.id) usedIds.add(best.id)
 
         if (best?.image_url) {
           const occupationName = language === 'es' ? best.occupation?.es : best.occupation?.en
-          console.log(`✅ Matched "${gen.phase1?.name}" → ${occupationName}`)
+          const genderMatch = best.gender === playerGender ? '✅' : '⚠️'
+          console.log(`${genderMatch} Matched "${gen.phase1?.name}" (${playerGender}) → ${occupationName} (${best.gender})`)
+          
+          // 🚨 ADVERTENCIA si el género no coincide
+          if (playerGender && playerGender !== 'unknown' && best.gender !== playerGender) {
+            console.warn(`⚠️ WARNING: Gender mismatch for "${gen.phase1?.name}": player is ${playerGender} but suspect is ${best.gender}`)
+          }
+          
           gen.photo = best.image_url
         }
       })
     }
+
 
     // ============================================
     // PASO 3: Generar hiddenContext
@@ -1142,10 +1249,14 @@ export async function generateImpostorPhases(req: Request, res: Response) {
       config: {
       caseType: body.caseType,
       totalClues: body.clues,
-      scenario: body.customScenario 
-        ? buildCustomScenarioText(body.customScenario)
-        : (body.scenario || 'aleatorio'),
+      scenario: hasCustomContext
+        ? 'DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO'
+        : body.customScenario 
+          ? buildCustomScenarioText(body.customScenario)
+          : (body.scenario || 'aleatorio'),
       customScenario: body.customScenario || undefined,
+      customContext: body.customContext?.trim() || undefined,
+      customVictim: body.customVictim || undefined,
       difficulty: body.difficulty,
       },
     }

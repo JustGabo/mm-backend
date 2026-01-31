@@ -458,10 +458,10 @@ ${creativeClueSuggestions}
 **FASES DEL JUEGO:**
 - FASE 1 (roundNumber 1): Motivo de sospecha - MOCKEADA (no se genera aquí)
 - FASE 2 (roundNumber 2): Coartadas oficiales - MOCKEADA (no se genera aquí)
-- FASE 3 (roundNumber 3): Preguntas de clarificación - Genera preguntas para aclarar detalles ambiguos sobre posiciones, acciones, relaciones entre jugadores, o comportamientos observados. NO preguntes sobre tiempos porque eso ya se cubrió en la ronda 2 (coartadas oficiales).
+- FASE 3 (roundNumber 3): Observaciones sospechosas - Genera una pregunta (tipo "question") que invite a cada jugador a compartir sus observaciones sospechosas sobre otros jugadores. Los jugadores pueden responder basándose en la información de su ficha (especialmente en "OBSERVACIONES SOSPECHOSAS" del additionalContext). La pregunta debe ser CONCRETA y permitir que cada jugador exprese lo que observó, NO preguntes sobre sentimientos, emociones, o influencias subjetivas. Ejemplo CORRECTO: "Cada uno de ustedes debe compartir qué observaciones sospechosas notó sobre otros jugadores durante la noche del crimen. ¿Qué comportamientos, movimientos, o acciones les parecieron extraños?" Ejemplo INCORRECTO: "¿Cómo creen que estas tensiones pudieron haber influido en sus comportamientos?" o "¿Cómo se sintieron al respecto?" - estas preguntas son demasiado subjetivas y no tienen sentido.
 - FASE 4 (roundNumber 4): Evidencias generadas - Genera descubrimientos/pistas lógicas basadas en las fichas de los jugadores, como las coartadas, los motivos 
 - FASE 5 (roundNumber 5): Contradicciones directas - Compara lo que dijeron diferentes jugadores y señala contradicciones (ej: "La coartada de Carlos dice que vio la luz encendida, pero Ana dice que estaba todo oscuro. ¿Quién está mintiendo?")
-- FASE 6 (roundNumber 6): Presión final - Haz preguntas que generen debates entre sospechosos, para que se den cuenta de las contradicciones y pistas que se han generado.
+- FASE 6 (roundNumber 6): Presión final - Haz preguntas CONCRETAS que generen debates entre sospechosos basadas en información REAL de las fichas. NO hagas preguntas subjetivas sobre sentimientos, emociones, o influencias. Enfócate en preguntas que los jugadores puedan responder con información concreta de sus fichas.
 - FASE 7 (roundNumber 7): Revelar culpable - No se genera aquí, va directo a revelar
 
 **TIPOS DE INTERVENCIONES DEL DETECTIVE:**
@@ -496,14 +496,19 @@ Puedes hacer 3 tipos de intervenciones (varía entre rondas):
      * Ejemplo: "[Jugador A] dice que su discusión con [víctima] era pequeña (solo si esto se menciona en el motivo), pero [Jugador B] nos contó que escuchó gritos fuertes. ¿Quién exagera o quién miente?"
 
 **REGLAS PARA LA INTERVENCIÓN SEGÚN LA FASE:**
-1. **FASE 3 (roundNumber 3) - Preguntas de clarificación:**
+1. **FASE 3 (roundNumber 3) - Observaciones sospechosas:**
    - Tipo: "question"
-   - Enfócate en aclarar detalles ambiguos sobre posiciones, acciones, relaciones entre jugadores, o comportamientos observados
-   - **CRÍTICO: NO preguntes sobre tiempos porque eso ya se cubrió en la ronda 2 (coartadas oficiales)**
-   - **CRÍTICO: NO preguntes sobre qué vieron o escucharon porque eso probablemente ya se habló en la ronda 2 cuando se hablaron las coartadas**
-   - Haz preguntas específicas que ayuden a entender mejor las relaciones y comportamientos, NO sobre detalles de las coartadas
-   - Ejemplo: "¿Tenían alguna relación previa con la víctima que pueda ser relevante?"
-   - Ejemplo: "¿Notaron algún comportamiento extraño en otros jugadores durante la noche?"
+   - **🚨 CRÍTICO: Esta ronda es ESPECÍFICAMENTE para que los jugadores compartan sus observaciones sospechosas basándose en la información de sus fichas**
+   - Genera una pregunta CONCRETA que invite a cada jugador a compartir qué observó sobre otros jugadores
+   - Los jugadores pueden responder basándose en la sección "OBSERVACIONES SOSPECHOSAS" de su additionalContext
+   - **CRÍTICO: NO hagas preguntas subjetivas sobre sentimientos, emociones, o influencias (ej: "¿cómo creen que estas tensiones pudieron haber influido?" o "¿cómo se sintieron?") - estas preguntas no tienen sentido y pueden llevar a contradicciones**
+   - **CRÍTICO: NO preguntes sobre tiempos, ubicaciones, o coartadas porque eso ya se cubrió en la ronda 2**
+   - La pregunta debe permitir que cada jugador exprese CONCRETAMENTE lo que observó, basándose en su información
+   - Ejemplo CORRECTO: "Cada uno de ustedes debe compartir qué observaciones sospechosas notó sobre otros jugadores durante la noche del crimen. ¿Qué comportamientos, movimientos, conversaciones, o acciones les parecieron extrañas o sospechosas?"
+   - Ejemplo CORRECTO: "Basándose en lo que observaron durante la noche, ¿qué comportamientos o acciones de otros jugadores les llamaron la atención como sospechosos?"
+   - Ejemplo INCORRECTO: "¿Cómo creen que estas tensiones pudieron haber influido en sus comportamientos durante la noche del crimen?" (demasiado subjetivo, no tiene sentido)
+   - Ejemplo INCORRECTO: "¿Cómo se sintieron al respecto?" (demasiado vago y subjetivo)
+
 
 2. **FASE 4 (roundNumber 4) - Evidencias generadas:**
    - Tipo: "discovery"
