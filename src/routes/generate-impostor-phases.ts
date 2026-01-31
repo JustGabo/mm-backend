@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { SuspectService } from '../services/suspect-service.js'
 import { WeaponService } from '../services/weapon-service.js'
-import { getRoomPlayers, Player, Suspect } from '../services/supabase.js'
+import { getRoomPlayers, getSupabase, Player, Suspect } from '../services/supabase.js'
 import OpenAI from 'openai'
 import {
   ImpostorPhasesGenerationRequest,
@@ -865,6 +865,105 @@ ${allPlayers.map(p => `- ${p.phase1?.name || 'No name'} (${p.playerId}): ${p.pha
   return parsed.hiddenContext
 }
 
+/**
+ * Guardar caso multijugador (phases) en Supabase (tabla cases y relacionadas, mode = multiplayer)
+ */
+async function savePhasesCaseToSupabase(
+  caseCore: any,
+  players: any[],
+  hiddenContext: any,
+  request: ImpostorPhasesGenerationRequest,
+  killerPlayerId: string
+): Promise<void> {
+  const supabase = getSupabase()
+  const scenarioValue = request.customScenario
+    ? buildCustomScenarioText(request.customScenario)
+    : (request.scenario || null)
+  const caseInsert: any = {
+    case_title: caseCore.caseTitle,
+    case_description: caseCore.caseDescription,
+    case_type: request.caseType,
+    scenario: scenarioValue,
+    difficulty: request.difficulty,
+    style: request.style || 'realistic',
+    language: request.language || 'es',
+    suspects_count: request.suspects,
+    clues_count: request.clues,
+    mode: 'multiplayer',
+  }
+  if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)
+  if (request.customContext?.trim()) caseInsert.custom_context = request.customContext.trim()
+  if (request.customVictim && Object.keys(request.customVictim).length > 0) caseInsert.custom_victim = request.customVictim
+
+  const { data: caseData, error: caseError } = await supabase.from('cases').insert(caseInsert).select().single()
+  if (caseError) throw new Error(`Error saving case: ${caseError.message}`)
+  const caseId = caseData.id
+
+  const victim = caseCore.victim
+  const { error: victimError } = await supabase.from('case_victims').insert({
+    case_id: caseId,
+    name: victim.name,
+    age: victim.age,
+    role: victim.role,
+    description: victim.description,
+    cause_of_death: victim.causeOfDeath,
+    time_of_death: victim.timeOfDeath,
+    discovered_by: victim.discoveredBy,
+    location: victim.location,
+    body_position: victim.bodyPosition,
+    visible_injuries: victim.visibleInjuries,
+    objects_at_scene: victim.objectsAtScene,
+    signs_of_struggle: victim.signsOfStruggle,
+  })
+  if (victimError) throw new Error(`Error saving victim: ${victimError.message}`)
+
+  const suspectsToInsert = players.map((p) => ({
+    case_id: caseId,
+    suspect_key: p.playerId || `player-${players.indexOf(p)}`,
+    name: p.phase1?.name ?? '',
+    age: null,
+    role: p.phase1?.occupation ?? '',
+    gender: p.phase1?.gender ?? null,
+    description: p.phase1?.description ?? null,
+    motive: null,
+    alibi: p.phase4?.alibi ?? null,
+    time_gap: null,
+    suspicious: true,
+    photo: p.phase1?.photo ?? null,
+    traits: null,
+    last_seen: null,
+    relationship_to_victim: p.phase1?.relationshipToVictim ?? null,
+    is_guilty: p.playerId === killerPlayerId,
+  }))
+  const { error: suspectsError } = await supabase.from('case_suspects').insert(suspectsToInsert)
+  if (suspectsError) throw new Error(`Error saving suspects: ${suspectsError.message}`)
+
+  if (hiddenContext) {
+    const { error: hiddenError } = await supabase.from('case_hidden_context').insert({
+      case_id: caseId,
+      guilty_suspect_key: killerPlayerId,
+      guilty_reason: hiddenContext.killerReason,
+      key_clues: hiddenContext.keyClues || [],
+      guilty_traits: hiddenContext.killerTraits || [],
+    })
+    if (hiddenError) console.warn('⚠️ case_hidden_context:', hiddenError.message)
+  }
+
+  if (caseCore.weapon) {
+    const w = caseCore.weapon
+    const { error: weaponError } = await supabase.from('case_weapons').insert({
+      case_id: caseId,
+      weapon_key: w.id || 'weapon-1',
+      name: typeof w.name === 'string' ? w.name : (w.name?.es || w.name?.en || ''),
+      description: w.description,
+      location: w.location,
+      photo: w.photo,
+      importance: w.importance || 'high',
+    })
+    if (weaponError) console.warn('⚠️ case_weapons:', weaponError.message)
+  }
+}
+
 export async function generateImpostorPhases(req: Request, res: Response) {
   try {
     console.log('API Route: generate-impostor-phases called (MULTI-STEP)')
@@ -1269,6 +1368,9 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     console.log('✅ Impostor phases generated successfully (MULTI-STEP)')
     console.log(`   Killer: ${killerPlayerId}`)
     console.log(`   Players: ${allPlayers.length}`)
+
+    // Guardar caso en tabla cases (mode = multiplayer)
+    await savePhasesCaseToSupabase(caseCore, allPlayers, hiddenContext, body, finalKillerId)
 
     return res.json(response)
     

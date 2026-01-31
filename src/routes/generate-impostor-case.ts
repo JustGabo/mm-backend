@@ -686,6 +686,106 @@ ${allPlayers.map(p => `- ${p.name} (${p.id}): ${p.role} - ${p.isKiller ? 'ASESIN
   return parsed.hiddenContext
 }
 
+/**
+ * Guardar caso impostor en Supabase (tabla cases y relacionadas, mode = impostor)
+ */
+async function saveImpostorCaseToSupabase(
+  caseCore: any,
+  players: any[],
+  hiddenContext: any,
+  request: ImpostorCaseGenerationRequest,
+  randomKillerIndex: number
+): Promise<void> {
+  const supabase = getSupabase()
+  const scenarioValue = request.customScenario
+    ? buildCustomScenarioText(request.customScenario)
+    : (request.scenario || null)
+  const caseInsert: any = {
+    case_title: caseCore.caseTitle,
+    case_description: caseCore.caseDescription,
+    case_type: request.caseType,
+    scenario: scenarioValue,
+    difficulty: request.difficulty,
+    style: request.style || 'realistic',
+    language: request.language || 'es',
+    suspects_count: request.suspects,
+    clues_count: request.clues,
+    mode: 'impostor',
+  }
+  if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)
+  if (request.customContext?.trim()) caseInsert.custom_context = request.customContext.trim()
+  if (request.customVictim && Object.keys(request.customVictim).length > 0) caseInsert.custom_victim = request.customVictim
+
+  const { data: caseData, error: caseError } = await supabase.from('cases').insert(caseInsert).select().single()
+  if (caseError) throw new Error(`Error saving case: ${caseError.message}`)
+  const caseId = caseData.id
+
+  const victim = caseCore.victim
+  const { error: victimError } = await supabase.from('case_victims').insert({
+    case_id: caseId,
+    name: victim.name,
+    age: victim.age,
+    role: victim.role,
+    description: victim.description,
+    cause_of_death: victim.causeOfDeath,
+    time_of_death: victim.timeOfDeath,
+    discovered_by: victim.discoveredBy,
+    location: victim.location,
+    body_position: victim.bodyPosition,
+    visible_injuries: victim.visibleInjuries,
+    objects_at_scene: victim.objectsAtScene,
+    signs_of_struggle: victim.signsOfStruggle,
+  })
+  if (victimError) throw new Error(`Error saving victim: ${victimError.message}`)
+
+  const killerIdStr = `player-${randomKillerIndex}`
+  const suspectsToInsert = players.map((s) => ({
+    case_id: caseId,
+    suspect_key: s.id,
+    name: s.name,
+    age: s.age ?? null,
+    role: s.role,
+    gender: s.gender ?? null,
+    description: s.description ?? null,
+    motive: null,
+    alibi: s.alibi ?? null,
+    time_gap: null,
+    suspicious: true,
+    photo: s.photo ?? null,
+    traits: s.traits ?? null,
+    last_seen: s.whereWas ?? s.location ?? null,
+    relationship_to_victim: null,
+    is_guilty: s.id === killerIdStr,
+  }))
+  const { error: suspectsError } = await supabase.from('case_suspects').insert(suspectsToInsert)
+  if (suspectsError) throw new Error(`Error saving suspects: ${suspectsError.message}`)
+
+  if (hiddenContext) {
+    const { error: hiddenError } = await supabase.from('case_hidden_context').insert({
+      case_id: caseId,
+      guilty_suspect_key: hiddenContext.killerId,
+      guilty_reason: hiddenContext.killerReason,
+      key_clues: hiddenContext.keyClues || [],
+      guilty_traits: hiddenContext.killerTraits || [],
+    })
+    if (hiddenError) console.warn('⚠️ case_hidden_context:', hiddenError.message)
+  }
+
+  if (caseCore.weapon) {
+    const w = caseCore.weapon
+    const { error: weaponError } = await supabase.from('case_weapons').insert({
+      case_id: caseId,
+      weapon_key: w.id || 'weapon-1',
+      name: typeof w.name === 'string' ? w.name : (w.name?.es || w.name?.en || ''),
+      description: w.description,
+      location: w.location,
+      photo: w.photo,
+      importance: w.importance || 'high',
+    })
+    if (weaponError) console.warn('⚠️ case_weapons:', weaponError.message)
+  }
+}
+
 router.post('/api/generate-impostor-case', async (req: Request, res: Response) => {
   try {
     console.log('API Route: generate-impostor-case called (MULTI-STEP)');
@@ -944,6 +1044,9 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
     console.log('✅ Impostor case generated successfully (MULTI-STEP)');
     console.log(`   Killer: player-${randomKillerIndex}`);
     console.log(`   Players: ${allPlayers.length}`);
+
+    // Guardar caso en tabla cases (mode = impostor)
+    await saveImpostorCaseToSupabase(caseCore, allPlayers, hiddenContext, body, randomKillerIndex);
 
     res.json(response);
     

@@ -725,11 +725,20 @@ async function saveCaseToSupabase(
       language: request.language || 'es',
       suspects_count: request.suspects,
       clues_count: request.clues,
+      mode: 'detective', // Caso generado por generate-initial-case
     }
   
-  // Intentar agregar custom_scenario como JSON si existe la columna (no crítico si falla)
+  // custom_scenario (si existe la columna)
   if (request.customScenario) {
     caseInsert.custom_scenario = JSON.stringify(request.customScenario)
+  }
+  // custom_context: contexto narrativo libre
+  if (request.customContext?.trim()) {
+    caseInsert.custom_context = request.customContext.trim()
+  }
+  // custom_victim: víctima personalizada (JSON)
+  if (request.customVictim && Object.keys(request.customVictim).length > 0) {
+    caseInsert.custom_victim = request.customVictim
   }
 
   const { data: caseData, error: caseError } = await supabase
