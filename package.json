@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
     "test:case": "tsx test-generate-case.ts",
+    "test:initial-case-validation": "tsx test-initial-case-validation.ts",
     "test:impostor-case": "tsx test-generate-impostor-case.ts",
     "test:impostor-discussion": "tsx test-generate-impostor-discussion.ts",
     "test:impostor-phases": "tsx test-generate-impostor-phases.ts",

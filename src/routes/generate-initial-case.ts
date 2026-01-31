@@ -304,11 +304,14 @@ async function generateCaseCore(
   const openai = getOpenAIClient()
   
   // Determinar el escenario a usar
-  const scenarioText = request.customScenario 
-    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
-    : `Escenario: ${request.scenario || 'aleatorio'}`
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioText = hasCustomContext
+    ? 'Escenario: DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO'
+    : request.customScenario 
+      ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+      : `Escenario: ${request.scenario || 'aleatorio'}`
 
-  const customScenarioDetails = request.customScenario
+  const customScenarioDetails = !hasCustomContext && request.customScenario
     ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
 - Lugar: ${request.customScenario.place}
 ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
@@ -480,11 +483,14 @@ ${existingSuspects.map(s => `- ${s.name} (${s.role}): ${s.description || 'Sin de
     : ''
 
   // Determinar el escenario a usar
-  const scenarioText = request.customScenario 
-    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
-    : `Escenario: ${request.scenario || 'aleatorio'}`
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioText = hasCustomContext
+    ? 'Escenario: DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO'
+    : request.customScenario 
+      ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+      : `Escenario: ${request.scenario || 'aleatorio'}`
 
-  const customScenarioDetails = request.customScenario
+  const customScenarioDetails = !hasCustomContext && request.customScenario
     ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
 - Lugar: ${request.customScenario.place}
 ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
@@ -616,11 +622,14 @@ async function generateHiddenContext(
   const guiltySuspect = allSuspects.find(s => s.id === `suspect-${randomGuiltyIndex}`)
   
   // Determinar el escenario a usar
-  const scenarioText = request.customScenario 
-    ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
-    : `Escenario: ${request.scenario || 'aleatorio'}`
+  const hasCustomContext = Boolean(request.customContext && request.customContext.trim().length > 0)
+  const scenarioText = hasCustomContext
+    ? 'Escenario: DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO'
+    : request.customScenario 
+      ? `Escenario personalizado: ${buildCustomScenarioText(request.customScenario)}`
+      : `Escenario: ${request.scenario || 'aleatorio'}`
 
-  const customScenarioDetails = request.customScenario
+  const customScenarioDetails = !hasCustomContext && request.customScenario
     ? `\n**CONTEXTO DEL ESCENARIO PERSONALIZADO:**
 - Lugar: ${request.customScenario.place}
 ${request.customScenario.themeOrSituation ? `- Tema/Situación: ${request.customScenario.themeOrSituation}` : ''}
@@ -829,13 +838,16 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields: caseType, suspects, clues, difficulty' })
     }
 
-    // Validar que solo haya scenario o customScenario, no ambos
-    if (body.scenario && body.customScenario) {
+    const hasCustomContext = Boolean(body.customContext && body.customContext.trim().length > 0)
+
+    // Validar que solo haya scenario o customScenario, no ambos (si NO hay customContext)
+    if (!hasCustomContext && body.scenario && body.customScenario) {
       return res.status(400).json({ error: 'Cannot provide both scenario and customScenario. Provide only one.' })
     }
 
-    if (!body.scenario && !body.customScenario) {
-      return res.status(400).json({ error: 'Must provide either scenario or customScenario' })
+    // Si no hay customContext, debe proporcionarse scenario o customScenario
+    if (!hasCustomContext && !body.scenario && !body.customScenario) {
+      return res.status(400).json({ error: 'Must provide either scenario, customScenario, or customContext' })
     }
 
     const { language = 'es', playerNames: rawPlayerNames = [], playerGenders: rawPlayerGenders = [] } = body
@@ -856,8 +868,8 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
             .filter(Boolean)
 
     // Obtener sospechosos desde Supabase
-    // Si hay customScenario, no pasar scene (obtendrá aleatorios)
-    const sceneForService = body.customScenario ? undefined : body.scenario
+    // Si hay customScenario o customContext, no pasar scene (obtendrá aleatorios)
+    const sceneForService = (hasCustomContext || body.customScenario) ? undefined : body.scenario
 
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
@@ -867,13 +879,13 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     })
 
     // Seleccionar arma
-    // Si hay customScenario, no pasar scene (obtendrá aleatoria)
+    // Si hay customScenario o customContext, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null
     if (body.caseType === 'asesinato') {
       selectedWeapon = await WeaponService.selectWeapon({
         scene: sceneForService,
         style: body.style,
-        preferSpecific: !body.customScenario, // No preferir específica si es custom
+        preferSpecific: !(hasCustomContext || body.customScenario), // No preferir específica si es custom
       })
     }
 
@@ -1033,9 +1045,11 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
       config: {
         caseType: body.caseType,
         totalClues: body.clues,
-        scenario: body.customScenario 
-          ? buildCustomScenarioText(body.customScenario)
-          : (body.scenario || 'aleatorio'),
+        scenario: hasCustomContext
+          ? 'DEFINIDO POR EL CONTEXTO PERSONALIZADO DEL USUARIO'
+          : body.customScenario 
+            ? buildCustomScenarioText(body.customScenario)
+            : (body.scenario || 'aleatorio'),
         customScenario: body.customScenario || undefined,
         customContext: body.customContext?.trim() || undefined,
         customVictim: body.customVictim || undefined,

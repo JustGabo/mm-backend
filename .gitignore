@@ -16,9 +16,12 @@ npm-debug.log*
 
 # Test response files
 test-response.json
+test-response-error.json
 test-impostor-response.json
 test-impostor-discussion-response.json
 test-impostor-discussion-round-*.json
+test-impostor-phases-response.json
+test-impostor-phases-error.json
 
 # Test files
 test-generate-case.ts

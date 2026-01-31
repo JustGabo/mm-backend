@@ -1,6 +1,0 @@
-{
-  "error": "Server responded with error",
-  "details": {
-    "error": "No players found in room or error fetching players"
-  }
-}
