@@ -883,6 +883,7 @@ async function savePhasesCaseToSupabase(
     case_title: caseCore.caseTitle,
     case_description: caseCore.caseDescription,
     case_type: request.caseType,
+    room_id: request.roomId,
     scenario: scenarioValue,
     difficulty: request.difficulty,
     style: request.style || 'realistic',
