@@ -5,6 +5,8 @@ export interface ImpostorPhasesGenerationRequest {
     caseType: string
     suspects: number
     clues: number
+    userId?: string
+    hostId?: string
     scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
     customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
     /**
