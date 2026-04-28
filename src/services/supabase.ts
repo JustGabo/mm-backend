@@ -144,6 +144,7 @@ export interface Player {
   room_id: string
   user_id: string | null
   name: string | null
+  img_url?: string | null
   is_ready: boolean | null
   role_data: any | null
   joined_at: string | null

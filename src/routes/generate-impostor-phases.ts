@@ -29,6 +29,32 @@ function getOpenAIClient(): OpenAI {
   return openaiClient
 }
 
+function isAbsoluteUrl(value?: string | null) {
+  return Boolean(value && /^https?:\/\//i.test(value))
+}
+
+async function resolveUserImageUrl(
+  supabase: any,
+  value?: string | null
+): Promise<string | null> {
+  if (!value) return null
+
+  if (isAbsoluteUrl(value)) {
+    return value
+  }
+
+  const { data, error } = await supabase
+    .storage
+    .from('user_images')
+    .createSignedUrl(value, 60 * 60)
+
+  if (error || !data?.signedUrl) {
+    return null
+  }
+
+  return data.signedUrl
+}
+
 /**
  * Intenta reparar strings no terminados en JSON
  */
@@ -930,7 +956,7 @@ async function savePhasesCaseToSupabase(
     alibi: p.phase4?.alibi ?? null,
     time_gap: null,
     suspicious: true,
-    photo: p.phase1?.photo ?? null,
+    photo: p.photo ?? p.phase1?.photo ?? null,
     traits: null,
     last_seen: null,
     relationship_to_victim: p.phase1?.relationshipToVictim ?? null,
@@ -1214,6 +1240,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
 
     // Asignar fotos de sospechosos reales
     if (selectedSuspects.length > 0) {
+      const supabase = getSupabase()
       const usedIds = new Set<string>()
       
       const scoreMatch = (gen: any, orig: any) => {
@@ -1226,7 +1253,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
         return score
       }
 
-      allPlayers.forEach((gen) => {
+      for (const gen of allPlayers) {
         const playerGender = gen.phase1?.gender
         const remaining = selectedSuspects.filter(s => !usedIds.has(s.id))
         
@@ -1262,6 +1289,18 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           best = remaining.find(o => !usedIds.has(o.id)) || null
         }
 
+        const matchedRoomPlayer = roomPlayers.find((player) => player.id === gen.playerId)
+
+        let profilePhoto: string | null = null
+        if (matchedRoomPlayer?.img_url) {
+          profilePhoto = await resolveUserImageUrl(supabase, matchedRoomPlayer.img_url)
+        }
+
+        if (profilePhoto) {
+          gen.photo = profilePhoto
+          continue
+        }
+
         if (best?.id) usedIds.add(best.id)
 
         if (best?.image_url) {
@@ -1276,7 +1315,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
           
           gen.photo = best.image_url
         }
-      })
+      }
     }
 
 
