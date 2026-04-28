@@ -53,6 +53,8 @@ export interface InitialCaseGenerationRequest {
   caseType: string
   suspects: number
   clues: number
+  userId?: string
+  hostId?: string
   scenario?: string // Opcional: escenario fijo (mansion, hotel, etc.)
   customScenario?: CustomScenario // Opcional: escenario personalizado con lugar y tema/situación
   /**
@@ -709,6 +711,7 @@ async function saveCaseToSupabase(
   request: InitialCaseGenerationRequest
 ): Promise<string> {
   const supabase = getSupabase()
+  const hostId = request.hostId || request.userId || null
   
   // 1. Insertar caso
   const scenarioValue = request.customScenario 
@@ -725,6 +728,7 @@ async function saveCaseToSupabase(
       language: request.language || 'es',
       suspects_count: request.suspects,
       clues_count: request.clues,
+      host_id: hostId,
       mode: 'detective', // Caso generado por generate-initial-case
     }
   

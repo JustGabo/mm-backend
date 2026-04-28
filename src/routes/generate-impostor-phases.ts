@@ -902,6 +902,7 @@ async function savePhasesCaseToSupabase(
   killerPlayerId: string
 ): Promise<void> {
   const supabase = getSupabase()
+  const hostId = request.hostId || request.userId || null
   const scenarioValue = request.customScenario
     ? buildCustomScenarioText(request.customScenario)
     : (request.scenario || null)
@@ -916,6 +917,7 @@ async function savePhasesCaseToSupabase(
     language: request.language || 'es',
     suspects_count: request.suspects,
     clues_count: request.clues,
+    host_id: hostId,
     mode: 'multiplayer',
   }
   if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)

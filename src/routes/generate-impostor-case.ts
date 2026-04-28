@@ -31,6 +31,8 @@ export interface ImpostorCaseGenerationRequest {
   caseType: string;
   suspects: number;
   clues: number;
+  userId?: string;
+  hostId?: string;
   scenario?: string; // Opcional: escenario fijo (mansion, hotel, etc.)
   customScenario?: CustomScenario; // Opcional: escenario personalizado con lugar y tema/situación
   /**
@@ -697,6 +699,7 @@ async function saveImpostorCaseToSupabase(
   randomKillerIndex: number
 ): Promise<void> {
   const supabase = getSupabase()
+  const hostId = request.hostId || request.userId || null
   const scenarioValue = request.customScenario
     ? buildCustomScenarioText(request.customScenario)
     : (request.scenario || null)
@@ -710,6 +713,7 @@ async function saveImpostorCaseToSupabase(
     language: request.language || 'es',
     suspects_count: request.suspects,
     clues_count: request.clues,
+    host_id: hostId,
     mode: 'impostor',
   }
   if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)
