@@ -899,13 +899,35 @@ async function savePhasesCaseToSupabase(
   players: any[],
   hiddenContext: any,
   request: ImpostorPhasesGenerationRequest,
-  killerPlayerId: string
+  killerPlayerId: string,
+  casePayload: any,
+  roomPlayers: Array<{
+    id: string
+    user_id?: string | null
+    name?: string | null
+    gender?: string | null
+    img_url?: string | null
+    pixel_img_url?: string | null
+    joined_at?: string | null
+  }>
 ): Promise<void> {
   const supabase = getSupabase()
   const hostId = request.hostId || request.userId || null
   const scenarioValue = request.customScenario
     ? buildCustomScenarioText(request.customScenario)
     : (request.scenario || null)
+  const participants = roomPlayers.map((player) => ({
+    userId: player.user_id || null,
+    playerId: player.id,
+    name: player.name || null,
+    gender: player.gender || null,
+    imgUrl: player.img_url || null,
+    pixelImgUrl: player.pixel_img_url || null,
+    joinedAt: player.joined_at || null,
+  }))
+  const participantUserIds = participants
+    .map((participant) => participant.userId)
+    .filter((value): value is string => Boolean(value))
   const caseInsert: any = {
     case_title: caseCore.caseTitle,
     case_description: caseCore.caseDescription,
@@ -919,6 +941,10 @@ async function savePhasesCaseToSupabase(
     clues_count: request.clues,
     host_id: hostId,
     mode: 'multiplayer',
+    case_data: casePayload,
+    accusations: [],
+    players_snapshot: participants,
+    players_ids: participantUserIds,
   }
   if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)
   if (request.customContext?.trim()) caseInsert.custom_context = request.customContext.trim()
@@ -961,7 +987,7 @@ async function savePhasesCaseToSupabase(
     photo: p.photo ?? p.phase1?.photo ?? null,
     traits: null,
     last_seen: null,
-    relationship_to_victim: p.phase1?.relationshipToVictim ?? null,
+    relationship_to_victim: p.phase1?.relationshipWithVictim ?? null,
     is_guilty: p.playerId === killerPlayerId,
   }))
   const { error: suspectsError } = await supabase.from('case_suspects').insert(suspectsToInsert)
@@ -1412,7 +1438,15 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     console.log(`   Players: ${allPlayers.length}`)
 
     // Guardar caso en tabla cases (mode = multiplayer)
-    await savePhasesCaseToSupabase(caseCore, allPlayers, hiddenContext, body, finalKillerId)
+    await savePhasesCaseToSupabase(
+      caseCore,
+      allPlayers,
+      hiddenContext,
+      body,
+      finalKillerId,
+      response,
+      roomPlayers
+    )
 
     return res.json(response)
     
