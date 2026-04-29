@@ -33,6 +33,13 @@ function isAbsoluteUrl(value?: string | null) {
   return Boolean(value && /^https?:\/\//i.test(value))
 }
 
+function isUuid(value?: string | null): value is string {
+  return Boolean(
+    value &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  )
+}
+
 async function resolveUserImageUrl(
   supabase: any,
   value?: string | null
@@ -899,13 +906,50 @@ async function savePhasesCaseToSupabase(
   players: any[],
   hiddenContext: any,
   request: ImpostorPhasesGenerationRequest,
-  killerPlayerId: string
+  killerPlayerId: string,
+  casePayload: any,
+  roomPlayers: Array<{
+    id: string
+    user_id?: string | null
+    name?: string | null
+    gender?: string | null
+    img_url?: string | null
+    pixel_img_url?: string | null
+    joined_at?: string | null
+  }>
 ): Promise<void> {
   const supabase = getSupabase()
   const hostId = request.hostId || request.userId || null
   const scenarioValue = request.customScenario
     ? buildCustomScenarioText(request.customScenario)
     : (request.scenario || null)
+  const participants = roomPlayers.map((player) => ({
+    userId: player.user_id || null,
+    playerId: player.id,
+    name: player.name || null,
+    gender: player.gender || null,
+    imgUrl: player.img_url || null,
+    pixelImgUrl: player.pixel_img_url || null,
+    joinedAt: player.joined_at || null,
+  }))
+  const sanitizedParticipants = participants.map((participant) => ({
+    userId: participant.userId,
+    playerId: participant.playerId,
+    name: participant.name,
+    gender: participant.gender,
+    imgUrl: participant.imgUrl,
+    pixelImgUrl: participant.pixelImgUrl,
+    joinedAt: participant.joinedAt,
+  }))
+  const participantPlayerIds = participants
+    .map((participant) => participant.playerId)
+    .filter(isUuid)
+  const participantUserIds = participants
+    .map((participant) => participant.userId)
+    .filter(isUuid)
+  const casePlayerIds = participantPlayerIds.length > 0
+    ? participantPlayerIds
+    : participantUserIds
   const caseInsert: any = {
     case_title: caseCore.caseTitle,
     case_description: caseCore.caseDescription,
@@ -919,14 +963,47 @@ async function savePhasesCaseToSupabase(
     clues_count: request.clues,
     host_id: hostId,
     mode: 'multiplayer',
+    case_data: casePayload,
+    accusations: [],
+    players_snapshot: sanitizedParticipants,
+    players_ids: casePlayerIds,
   }
   if (request.customScenario) caseInsert.custom_scenario = JSON.stringify(request.customScenario)
   if (request.customContext?.trim()) caseInsert.custom_context = request.customContext.trim()
   if (request.customVictim && Object.keys(request.customVictim).length > 0) caseInsert.custom_victim = request.customVictim
 
-  const { data: caseData, error: caseError } = await supabase.from('cases').insert(caseInsert).select().single()
+  const { data: caseData, error: caseError } = await supabase
+    .from('cases')
+    .insert(caseInsert)
+    .select('id, players_snapshot, players_ids')
+    .single()
   if (caseError) throw new Error(`Error saving case: ${caseError.message}`)
   const caseId = caseData.id
+
+  const snapshotMissing = sanitizedParticipants.length > 0 &&
+    (!Array.isArray(caseData.players_snapshot) || caseData.players_snapshot.length === 0)
+  const playerIdsMissing = casePlayerIds.length > 0 &&
+    (!Array.isArray(caseData.players_ids) || caseData.players_ids.length === 0)
+
+  if (snapshotMissing || playerIdsMissing) {
+    console.warn('players_snapshot or players_ids came back empty after insert, retrying case update', {
+      caseId,
+      snapshotCount: sanitizedParticipants.length,
+      playerIdsCount: casePlayerIds.length,
+    })
+
+    const { error: caseParticipantsError } = await supabase
+      .from('cases')
+      .update({
+        players_snapshot: sanitizedParticipants,
+        players_ids: casePlayerIds,
+      })
+      .eq('id', caseId)
+
+    if (caseParticipantsError) {
+      console.warn('Failed to backfill case participants after insert:', caseParticipantsError.message)
+    }
+  }
 
   const victim = caseCore.victim
   const { error: victimError } = await supabase.from('case_victims').insert({
@@ -961,7 +1038,7 @@ async function savePhasesCaseToSupabase(
     photo: p.photo ?? p.phase1?.photo ?? null,
     traits: null,
     last_seen: null,
-    relationship_to_victim: p.phase1?.relationshipToVictim ?? null,
+    relationship_to_victim: p.phase1?.relationshipWithVictim ?? null,
     is_guilty: p.playerId === killerPlayerId,
   }))
   const { error: suspectsError } = await supabase.from('case_suspects').insert(suspectsToInsert)
@@ -1028,7 +1105,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     }
 
     const roomPlayers = playersResult.players
-    console.log(`✅ Found ${roomPlayers.length} players in room`)
+    // console.log(`✅ Found ${roomPlayers.length} players in room`)
 
     // Extraer nombres y géneros de los jugadores
     const playerNames = roomPlayers.map((p: Player) => p.name || `Jugador ${p.id.slice(0, 8)}`)
@@ -1348,7 +1425,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     )
     // Asegurar que killerId esté correcto
     hiddenContext.killerId = killerIdForContext
-    console.log('✅ Paso 3 completado: HiddenContext generado')
+    // console.log('✅ Paso 3 completado: HiddenContext generado')
 
     // Preservar URL del arma
     if (selectedWeapon && caseCore.weapon) {
@@ -1367,7 +1444,7 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     // Asegurar que el killer tenga el playerId correcto
     if (!killerPlayer.playerId || killerPlayer.playerId === 'undefined') {
       killerPlayer.playerId = killerPlayerId
-      console.log(`✅ Assigned killerPlayerId to killer: ${killerPlayerId}`)
+      // console.log(`✅ Assigned killerPlayerId to killer: ${killerPlayerId}`)
     }
     
     const finalKillerId = killerPlayer.playerId || killerPlayerId
@@ -1403,16 +1480,24 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     }
     
     // Log final para verificación
-    console.log(`✅ Killer playerId final: ${finalKillerId}`)
-    console.log(`✅ Killer player name: ${killerPlayer?.phase1?.name || 'Unknown'}`)
-    console.log(`✅ Killer player index: ${randomKillerIndex + 1}`)
+    // console.log(`✅ Killer playerId final: ${finalKillerId}`)
+    // console.log(`✅ Killer player name: ${killerPlayer?.phase1?.name || 'Unknown'}`)
+    // console.log(`✅ Killer player index: ${randomKillerIndex + 1}`)
 
-    console.log('✅ Impostor phases generated successfully (MULTI-STEP)')
-    console.log(`   Killer: ${killerPlayerId}`)
-    console.log(`   Players: ${allPlayers.length}`)
+    // console.log('✅ Impostor phases generated successfully (MULTI-STEP)')
+    // console.log(`   Killer: ${killerPlayerId}`)
+    // console.log(`   Players: ${allPlayers.length}`)
 
     // Guardar caso en tabla cases (mode = multiplayer)
-    await savePhasesCaseToSupabase(caseCore, allPlayers, hiddenContext, body, finalKillerId)
+    await savePhasesCaseToSupabase(
+      caseCore,
+      allPlayers,
+      hiddenContext,
+      body,
+      finalKillerId,
+      response,
+      roomPlayers
+    )
 
     return res.json(response)
     
