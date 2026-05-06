@@ -837,42 +837,38 @@ router.post('/api/generate-impostor-case', async (req: Request, res: Response) =
     // Si hay customScenario o customContext, no pasar scene (obtendrá aleatorios)
     const sceneForService = (hasCustomContext || body.customScenario) ? undefined : body.scenario;
     
-    console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`);
-    if (hasCustomContext) {
-      console.log(`📝 Custom context detected - fetching random suspects`);
-    } else if (body.customScenario) {
-      console.log(`🎨 Custom scenario detected: "${buildCustomScenarioText(body.customScenario)}" - fetching random suspects`);
-      console.log(`   Place: ${body.customScenario.place}`);
-      if (body.customScenario.themeOrSituation) {
-        console.log(`   Theme/Situation: ${body.customScenario.themeOrSituation}`);
-      }
-    } else {
-      console.log(`📍 Fixed scenario: ${body.scenario}`);
-    }
-    if (playerGenders.length > 0) {
-      console.log(`👥 Player genders provided: ${playerGenders.join(', ')}`);
-    }
-    
+    const caseLogContext = {
+      route: 'generate-impostor-case',
+      caseType: body.caseType,
+      scenario: body.scenario,
+      suspects: body.suspects,
+      clues: body.clues,
+      difficulty: body.difficulty,
+      style: body.style,
+      hasCustomContext,
+      hasCustomScenario: Boolean(body.customScenario),
+    };
+
+    console.log('[case] impostor-case request', caseLogContext);
+
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: sceneForService,
       style: body.style,
       preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
+      logContext: caseLogContext,
     });
-    
-    console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`);
 
     // Seleccionar arma para casos de asesinato
     // Si hay customScenario o customContext, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null;
     if (body.caseType === 'asesinato') {
-      console.log(`🔫 Selecting murder weapon...`);
       selectedWeapon = await WeaponService.selectWeapon({
         scene: sceneForService,
         style: body.style,
         preferSpecific: !(hasCustomContext || body.customScenario), // No preferir específica si es custom
+        logContext: caseLogContext,
       });
-      console.log(`✅ Selected weapon: ${selectedWeapon?.name?.es}`);
     }
 
     // Generar número aleatorio para el asesino
