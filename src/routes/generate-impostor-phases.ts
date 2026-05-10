@@ -1072,10 +1072,7 @@ async function savePhasesCaseToSupabase(
 
 export async function generateImpostorPhases(req: Request, res: Response) {
   try {
-    console.log('API Route: generate-impostor-phases called (MULTI-STEP)')
-    
     const body: ImpostorPhasesGenerationRequest = req.body
-    console.log('Request body:', body)
     
     // Validate required fields
     if (!body.roomId || !body.caseType || !body.suspects || !body.clues || !body.difficulty) {
@@ -1095,6 +1092,19 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     }
 
     const { language = 'es' } = body
+
+    const caseLogContext = {
+      route: 'generate-impostor-phases',
+      roomId: body.roomId,
+      caseType: body.caseType,
+      scenario: body.scenario,
+      suspects: body.suspects,
+      clues: body.clues,
+      difficulty: body.difficulty,
+      style: body.style,
+      hasCustomContext,
+      hasCustomScenario: Boolean(body.customScenario),
+    }
 
     // Obtener jugadores de la sala desde Supabase
     console.log(`🔍 Fetching players from room ${body.roomId}...`)
@@ -1116,46 +1126,32 @@ export async function generateImpostorPhases(req: Request, res: Response) {
     // Si hay customScenario o customContext, no pasar scene (obtendrá aleatorios)
     const sceneForService = (hasCustomContext || body.customScenario) ? undefined : body.scenario;
     
-    console.log(`🔍 Fetching ${body.suspects} suspects from Supabase...`)
-    if (hasCustomContext) {
-      console.log(`📝 Custom context detected - fetching random suspects`);
-    } else if (body.customScenario) {
-      console.log(`🎨 Custom scenario detected: "${buildCustomScenarioText(body.customScenario)}" - fetching random suspects`);
-      console.log(`   Place: ${body.customScenario.place}`);
-      if (body.customScenario.themeOrSituation) {
-        console.log(`   Theme/Situation: ${body.customScenario.themeOrSituation}`);
-      }
-    } else {
-      console.log(`📍 Fixed scenario: ${body.scenario}`);
-    }
-    
     const preferredGenders = playerGenders.filter((g: string) => g !== 'unknown')
-    
+
+    console.log('[case] impostor-phases request', caseLogContext)
+
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: sceneForService,
       style: body.style,
       preferredGenders: preferredGenders.length > 0 ? preferredGenders : undefined,
+      logContext: caseLogContext,
     })
-    
+
     if (!selectedSuspects || selectedSuspects.length === 0) {
       return res.status(500).json({ error: 'No suspects available in database' })
     }
-    
-    console.log(`✅ Found ${selectedSuspects.length} suspects from Supabase`)
 
     // Seleccionar arma (solo para asesinato)
     // Si hay customScenario, no pasar scene (obtendrá aleatoria)
     let selectedWeapon = null
     if (body.caseType === 'asesinato') {
-      console.log(`🔫 Selecting murder weapon...`)
       selectedWeapon = await WeaponService.selectWeapon({
         scene: sceneForService,
         style: body.style,
         preferSpecific: !(hasCustomContext || body.customScenario), // No preferir específica si es custom
+        logContext: caseLogContext,
       })
-      const weaponName = language === 'es' ? selectedWeapon?.name?.es : selectedWeapon?.name?.en
-      console.log(`✅ Selected weapon: ${weaponName}`)
     }
 
     // Seleccionar asesino aleatorio

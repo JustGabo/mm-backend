@@ -884,11 +884,26 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
     // Si hay customScenario o customContext, no pasar scene (obtendrá aleatorios)
     const sceneForService = (hasCustomContext || body.customScenario) ? undefined : body.scenario
 
+    const caseLogContext = {
+      route: 'generate-initial-case',
+      caseType: body.caseType,
+      scenario: body.scenario,
+      suspects: body.suspects,
+      clues: body.clues,
+      difficulty: body.difficulty,
+      style: body.style,
+      hasCustomContext,
+      hasCustomScenario: Boolean(body.customScenario),
+    }
+
+    console.log('[case] initial-case request', caseLogContext)
+
     const selectedSuspects = await SuspectService.getSuspectsForScene({
       count: body.suspects,
       scene: sceneForService,
       style: body.style,
       preferredGenders: playerGenders.length > 0 ? playerGenders : undefined,
+      logContext: caseLogContext,
     })
 
     // Seleccionar arma
@@ -899,6 +914,7 @@ generateInitialCaseRouter.post('/', async (req: Request, res: Response) => {
         scene: sceneForService,
         style: body.style,
         preferSpecific: !(hasCustomContext || body.customScenario), // No preferir específica si es custom
+        logContext: caseLogContext,
       })
     }
 

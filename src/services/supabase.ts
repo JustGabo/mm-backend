@@ -20,9 +20,6 @@ function initializeSupabase(): SupabaseClient {
     throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not defined')
   }
 
-  console.log('🔗 Supabase URL:', supabaseUrl)
-  console.log('🔑 Supabase Key configured:', supabaseKey ? 'Yes' : 'No')
-
   supabaseClient = createClient(supabaseUrl, supabaseKey)
   return supabaseClient
 }
@@ -46,31 +43,76 @@ export const supabase = new Proxy({} as SupabaseClient, {
   }
 })
 
+/** Shape returned by PostgREST / Supabase client on failed queries */
+export type PostgrestLikeError = {
+  message: string
+  details?: string | null
+  hint?: string | null
+  code?: string
+}
+
 /**
- * Función para probar la conexión con Supabase
+ * Human-readable PostgREST error (use when `error` is non-null — avoid logging `{ error: null }` as if it were a failure).
  */
-export async function testSupabaseConnection(): Promise<{ success: boolean; error?: string }> {
+export function describePostgrestError(err: PostgrestLikeError | null | undefined): string {
+  if (err == null) {
+    return '(no error)'
+  }
+  const parts = [
+    err.code && `code=${err.code}`,
+    err.message && `message=${err.message}`,
+    err.details && `details=${err.details}`,
+    err.hint && `hint=${err.hint}`,
+  ].filter(Boolean)
+  return parts.length ? parts.join(' | ') : String(err)
+}
+
+/**
+ * One-line summary for logs. When `error` is null, PostgREST succeeded; `rowCount` may still be 0 (no matching rows).
+ * A real failure is always `error !== null` — compare that to an empty result (`error === null`, rowCount 0).
+ */
+export function supabaseResultSummary(
+  data: unknown[] | null | undefined,
+  error: PostgrestLikeError | null
+): string {
+  if (error) {
+    return `failed: ${describePostgrestError(error)}`
+  }
+  const n = Array.isArray(data) ? data.length : 0
+  return `ok, ${n} row(s), error=null`
+}
+
+/**
+ * Función para probar la conexión con Supabase (solo registra fallos salvo `logSuccess`)
+ */
+export async function testSupabaseConnection(options?: {
+  logSuccess?: boolean
+}): Promise<{ success: boolean; error?: string }> {
+  const logSuccess = options?.logSuccess ?? false
   try {
-    console.log('🔍 Testing Supabase connection...')
-    
-    // Intentar hacer una consulta simple
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('suspects')
       .select('id')
       .limit(1)
-    
+
     if (error) {
-      console.error('❌ Supabase connection test failed:', error)
+      console.error(
+        '[supabase] connection check failed:',
+        describePostgrestError(error),
+        { table: 'suspects', operation: 'select id limit 1' }
+      )
       return { success: false, error: error.message }
     }
-    
-    console.log('✅ Supabase connection successful')
+
+    if (logSuccess) {
+      console.log('[supabase] connection ok')
+    }
     return { success: true }
   } catch (error) {
-    console.error('❌ Supabase connection test error:', error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    console.error('[supabase] connection check exception:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
     }
   }
 }
@@ -99,6 +141,8 @@ export interface SuspectSelectionOptions {
   preferredGenders?: string[];
   occupationFilter?: string[]
   ageRange?: { min: number; max: number }
+  /** Request/case fields for correlating logs when queries fail */
+  logContext?: Record<string, unknown>
 }
 
 export interface Weapon {
@@ -118,6 +162,8 @@ export interface WeaponSelectionOptions {
   scene?: string
   style?: 'realistic' | 'pixel'
   preferSpecific?: boolean // true = prefer scene-specific, false = prefer universal
+  /** Request/case fields for correlating logs when queries fail */
+  logContext?: Record<string, unknown>
 }
 
 /**
@@ -195,11 +241,12 @@ export async function getCaseFromRoom(
       .single()
 
     if (error) {
-      console.error('❌ Error getting case from room:', error)
+      console.error('[supabase] getCaseFromRoom failed', {
+        roomId,
+        supabase: describePostgrestError(error),
+      })
       return { success: false, error: error.message }
     }
-
-    console.log('📦 Case data retrieved:', data?.case_data ? 'Found' : 'Not found')
     return { success: true, caseData: data?.case_data || null }
   } catch (error) {
     console.error('❌ Error getting case from room:', error)

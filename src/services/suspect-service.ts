@@ -1,4 +1,10 @@
-import { supabase, Suspect, SuspectSelectionOptions, testSupabaseConnection } from '../services/supabase.js'
+import {
+  supabase,
+  Suspect,
+  SuspectSelectionOptions,
+  testSupabaseConnection,
+  describePostgrestError,
+} from '../services/supabase.js'
 
 // Mapeo de escenarios del frontend a tags de Supabase
 const SCENARIO_TAG_MAP: Record<string, string> = {
@@ -26,14 +32,18 @@ export class SuspectService {
    * Obtiene sospechosos inteligentemente: del escenario + extras
    */
   static async getSuspectsForScene(options: SuspectSelectionOptions): Promise<Suspect[]> {
-    const { count, scene, style, preferredGenders } = options
+    const { count, scene, style, preferredGenders, logContext } = options
 
-    console.log('🔍 SUSPECT SERVICE: Getting', count, 'suspects for scene:', scene || 'random', 'with style:', style || 'any')
-    if (preferredGenders && preferredGenders.length > 0) {
-      console.log(`👥 Gender preferences: ${preferredGenders.join(', ')}`)
+    const baseLog: Record<string, unknown> = {
+      ...logContext,
+      count,
+      scene: scene ?? null,
+      style: style ?? null,
+      genderFilter: preferredGenders?.length ? preferredGenders.join(',') : null,
     }
 
-    // Probar la conexión primero
+    console.log('[suspects] start', baseLog)
+
     const connectionTest = await testSupabaseConnection()
     if (!connectionTest.success) {
       throw new Error(`Error de conexión con Supabase: ${connectionTest.error}`)
@@ -46,18 +56,15 @@ export class SuspectService {
     const extrasCount = this.calculateExtrasCount(count)
     const sceneSpecificCount = count - extrasCount
 
-    console.log(`📊 Distribution: ${sceneSpecificCount} from scene, ${extrasCount} extras`)
-
     let result: Suspect[] = []
 
-    // Si hay preferredGenders, obtener sospechosos por género desde el principio
     if (preferredGenders && preferredGenders.length > 0) {
-      console.log('🎯 Gender-specific selection mode: Getting suspects by gender for each position')
       return await this.getSuspectsByGenderPreferences({
         count,
         sceneTag,
         style,
-        preferredGenders
+        preferredGenders,
+        logContext: baseLog,
       })
     }
 
@@ -79,11 +86,14 @@ export class SuspectService {
         const { data: sceneData, error: sceneError } = await query
 
         if (sceneError) {
-          console.error('❌ Error fetching scene suspects:', sceneError)
+          console.error('[suspects] scene query failed', {
+            ...baseLog,
+            sceneTag,
+            query: { tagsContains: [sceneTag], style: style ?? null },
+            supabase: describePostgrestError(sceneError),
+          })
           throw new Error(`Error al obtener sospechosos del escenario: ${sceneError.message}`)
         }
-
-        console.log(`✅ Found ${sceneData?.length || 0} suspects for scene '${sceneTag}'`)
 
         // Mezclar y seleccionar
         const shuffledScene = (sceneData || []).sort(() => Math.random() - 0.5)
@@ -109,38 +119,27 @@ export class SuspectService {
           const { data: extrasData, error: extrasError } = await extrasQuery
 
           if (extrasError) {
-            console.warn('⚠️ Error fetching extras, continuing without them:', extrasError)
+            console.warn('[suspects] extras query failed (continuing without extras)', {
+              ...baseLog,
+              query: { tagsContains: ['extra'], style: style ?? null },
+              supabase: describePostgrestError(extrasError),
+            })
           } else {
-            console.log(`✅ Found ${extrasData?.length || 0} extra suspects`)
             const shuffledExtras = (extrasData || []).sort(() => Math.random() - 0.5)
-            
-            // Filtrar extras para evitar duplicados
+
             const uniqueExtras = shuffledExtras.filter(s => !addedIds.has(s.id))
             const selectedExtras = uniqueExtras.slice(0, extrasCount)
-            
-            // Actualizar IDs agregados
+
             selectedExtras.forEach(s => addedIds.add(s.id))
-            
+
             result.push(...selectedExtras)
-            
-            console.log(`🎭 Added ${selectedExtras.length} extras (filtered for duplicates):`)
-            selectedExtras.forEach((extra, i) => {
-              console.log(`  Extra ${i + 1}: ${extra.occupation?.es || extra.occupation}`)
-            })
           }
         }
 
       } else {
-        // Modo aleatorio: DISTRIBUIR EQUITATIVAMENTE entre diferentes escenarios
-        console.log('🎲 Random mode: Getting suspects with EQUITABLE DISTRIBUTION across scenarios')
-        console.log(`🎲 Query parameters: count=${count}, style=${style || 'any'}`)
-        
-        // Lista de todos los tags de escenario disponibles
         const scenarioTags = ['mansion', 'hotel', 'office', 'boat', 'theater', 'museum']
-        
-        // Calcular cuántos sospechosos obtener de cada tag para distribución equitativa
-        const suspectsPerTag = Math.ceil((count * 3) / scenarioTags.length) // Obtener más para luego seleccionar
-        console.log(`🎲 Will fetch ~${suspectsPerTag} suspects from EACH scenario tag, then randomly select ${count}`)
+
+        const suspectsPerTag = Math.ceil((count * 3) / scenarioTags.length)
         
         const allSuspects: Suspect[] = []
         const addedIds = new Set<string>()
@@ -148,7 +147,6 @@ export class SuspectService {
         // Obtener sospechosos de cada tag de escenario
         for (const tag of scenarioTags) {
           try {
-            console.log(`🎲 Fetching suspects with tag: ${tag}`)
             let tagQuery = supabase
               .from('suspects')
               .select('*')
@@ -163,28 +161,25 @@ export class SuspectService {
             const { data: tagData, error: tagError } = await tagQuery
 
             if (tagError) {
-              console.warn(`⚠️ Error fetching suspects with tag '${tag}':`, tagError)
+              console.warn('[suspects] random-mode tag query failed', {
+                ...baseLog,
+                tag,
+                supabase: describePostgrestError(tagError),
+              })
               continue
             }
 
             if (tagData && tagData.length > 0) {
-              console.log(`   ✅ Found ${tagData.length} suspects with tag '${tag}'`)
-              
-              // Filtrar duplicados y agregar
               const uniqueSuspects = tagData.filter(s => !addedIds.has(s.id))
               uniqueSuspects.forEach(s => addedIds.add(s.id))
               allSuspects.push(...uniqueSuspects)
-            } else {
-              console.log(`   ⚠️ No suspects found with tag '${tag}'`)
             }
           } catch (error) {
-            console.warn(`⚠️ Error processing tag '${tag}':`, error)
+            console.warn('[suspects] random-mode tag exception', { ...baseLog, tag, error })
             continue
           }
         }
 
-        // SIEMPRE obtener sospechosos con tag "extra" (y "random" si hay) para modo aleatorio
-        console.log('🎲 Fetching suspects with tag "extra" (always included in random mode)')
         let extraQuery = supabase
           .from('suspects')
           .select('*')
@@ -197,66 +192,23 @@ export class SuspectService {
 
         const { data: extraData, error: extraError } = await extraQuery
 
-        if (!extraError && extraData && extraData.length > 0) {
-          console.log(`   ✅ Found ${extraData.length} suspects with "extra" or "random" tags`)
+        if (extraError) {
+          console.warn('[suspects] random-mode extra/random query failed', {
+            ...baseLog,
+            supabase: describePostgrestError(extraError),
+          })
+        } else if (extraData && extraData.length > 0) {
           const uniqueExtras = extraData.filter(s => !addedIds.has(s.id))
           uniqueExtras.forEach(s => addedIds.add(s.id))
           allSuspects.push(...uniqueExtras)
-          console.log(`   ✅ Added ${uniqueExtras.length} unique suspects from "extra"/"random" tags to pool`)
-        } else {
-          console.log(`   ⚠️ No suspects found with "extra" or "random" tags`)
         }
 
-        console.log(`🎲 Total suspects collected from all tags: ${allSuspects.length}`)
-        
-        // Mostrar distribución por tag
-        const tagDistribution: Record<string, number> = {}
-        allSuspects.forEach(s => {
-          if (s.tags && Array.isArray(s.tags)) {
-            s.tags.forEach(tag => {
-              // Incluir tags de escenario, "extra", y "random"
-              if (scenarioTags.includes(tag) || tag === 'extra' || tag === 'random') {
-                tagDistribution[tag] = (tagDistribution[tag] || 0) + 1
-              }
-            })
-          }
-        })
-        console.log('🎲 Distribution by tag (scenarios + extra/random):')
-        Object.entries(tagDistribution)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([tag, count]) => {
-            console.log(`   - ${tag}: ${count} suspects`)
-          })
-        
-        // Shuffle y seleccionar
         const shuffled = allSuspects.sort(() => Math.random() - 0.5)
-        console.log('🎲 Shuffled all suspects, selecting first', count)
         result = shuffled.slice(0, count)
-        
-        // Mostrar los seleccionados después del shuffle
-        console.log('🎲 Selected suspects AFTER shuffle:')
-        const finalTagDistribution: Record<string, number> = {}
-        result.forEach((s, i) => {
-          console.log(`   ${i + 1}. ID: ${s.id} - ${s.occupation?.es || 'NO_OCCUPATION'} - Tags: ${s.tags?.join(', ') || 'NO_TAGS'}`)
-          if (s.tags && Array.isArray(s.tags)) {
-            s.tags.forEach(tag => {
-              // Incluir tags de escenario, "extra", y "random"
-              if (scenarioTags.includes(tag) || tag === 'extra' || tag === 'random') {
-                finalTagDistribution[tag] = (finalTagDistribution[tag] || 0) + 1
-              }
-            })
-          }
-        })
-        console.log('🎲 Final distribution in selected suspects (scenarios + extra/random):')
-        Object.entries(finalTagDistribution)
-          .sort((a, b) => b[1] - a[1])
-          .forEach(([tag, count]) => {
-            console.log(`   - ${tag}: ${count} (${((count / result.length) * 100).toFixed(1)}%)`)
-          })
       }
 
     } catch (error) {
-      console.error('❌ Error in getSuspectsForScene:', error)
+      console.error('[suspects] getSuspectsForScene failed', { ...baseLog, error })
       
       // Proporcionar mensajes de error más específicos
       if (error instanceof Error) {
@@ -276,7 +228,11 @@ export class SuspectService {
 
     // Si no obtuvimos suficientes sospechosos, intentar llenar con cualquiera
     if (result.length < count) {
-      console.log(`⚠️ Only got ${result.length}/${count} suspects, filling with random ones...`)
+      console.warn('[suspects] shortfall; filling from general pool', {
+        ...baseLog,
+        have: result.length,
+        need: count,
+      })
       
       // Track de IDs agregados para evitar duplicados al rellenar
       const addedIds = new Set(result.map(s => s.id))
@@ -291,36 +247,42 @@ export class SuspectService {
         fillQuery = fillQuery.eq('style', style)
       }
 
-      const { data: fillData } = await fillQuery
+      const { data: fillData, error: fillError } = await fillQuery
 
-      if (fillData) {
+      if (fillError) {
+        console.error('[suspects] fill query failed', {
+          ...baseLog,
+          supabase: describePostgrestError(fillError),
+        })
+      } else if (fillData) {
         const shuffled = fillData.sort(() => Math.random() - 0.5)
-        
-        // Filtrar para evitar duplicados
+
         const uniqueFill = shuffled.filter(s => !addedIds.has(s.id))
         const needed = count - result.length
         const toAdd = uniqueFill.slice(0, needed)
-        
+
         result.push(...toAdd)
-        
-        console.log(`✅ Added ${toAdd.length} unique suspects to fill (avoided ${shuffled.length - uniqueFill.length} duplicates)`)
       }
     }
 
-    // ULTIMA VERIFICACIÓN: eliminar duplicados por ID por si acaso
-    const uniqueResult = result.filter((suspect, index, self) => 
-      index === self.findIndex((s) => s.id === suspect.id)
+    const uniqueResult = result.filter((suspect, index, self) =>
+      index === self.findIndex(s => s.id === suspect.id)
     )
-    
+
     if (uniqueResult.length < result.length) {
-      console.log(`⚠️ Removed ${result.length - uniqueResult.length} duplicate suspects`)
+      console.warn('[suspects] deduplicated rows', {
+        ...baseLog,
+        before: result.length,
+        after: uniqueResult.length,
+      })
     }
 
-    console.log(`🎯 FINAL RESULT: Returning ${uniqueResult.length} unique suspects:`)
-    uniqueResult.forEach((suspect, index) => {
-      const tags = suspect.tags?.join(', ') || 'no-tags'
-      const isExtra = suspect.tags?.includes('extra') ? '⭐ EXTRA' : ''
-      console.log(`  ${index + 1}. ${suspect.id || 'NO_ID'} - ${suspect.gender || 'NO_GENDER'} - ${suspect.approx_age || 'NO_AGE'} - ${suspect.occupation?.es || suspect.occupation || 'NO_OCCUPATION'} - [${tags}] ${isExtra}`)
+    const extrasInResult = uniqueResult.filter(s => s.tags?.includes('extra')).length
+    console.log('[suspects] ok', {
+      ...baseLog,
+      returned: uniqueResult.length,
+      ids: uniqueResult.map(s => s.id),
+      extras: extrasInResult,
     })
 
     return uniqueResult
@@ -334,17 +296,15 @@ export class SuspectService {
     sceneTag: string | null
     style?: 'realistic' | 'pixel'
     preferredGenders: string[]
+    logContext?: Record<string, unknown>
   }): Promise<Suspect[]> {
-    const { count, sceneTag, style, preferredGenders } = options
+    const { count, sceneTag, style, preferredGenders, logContext } = options
+    const baseLog = logContext ?? {}
     const result: Suspect[] = []
     const usedIds = new Set<string>()
 
-    console.log(`🎯 Getting ${count} suspects with gender-specific filtering`)
-
-    // Para cada posición, obtener un sospechoso del género correcto
     for (let i = 0; i < count && i < preferredGenders.length; i++) {
       const requiredGender = preferredGenders[i].toLowerCase()
-      console.log(`  Position ${i + 1}: Looking for ${requiredGender}...`)
 
       // Construir query base
       let query = supabase
@@ -370,8 +330,13 @@ export class SuspectService {
       const { data, error } = await query
 
       if (error) {
-        console.error(`❌ Error fetching ${requiredGender} suspects:`, error)
-        // Continuar con el siguiente género
+        console.error('[suspects] gender-slot query failed', {
+          ...baseLog,
+          sceneTag,
+          position: i + 1,
+          gender: requiredGender,
+          supabase: describePostgrestError(error),
+        })
         continue
       }
 
@@ -381,7 +346,12 @@ export class SuspectService {
         .sort(() => Math.random() - 0.5)
 
       if (available.length === 0) {
-        console.warn(`⚠️ No available ${requiredGender} suspects found for position ${i + 1}, trying without scene filter...`)
+        console.warn('[suspects] gender-slot empty; retrying without scene tag', {
+          ...baseLog,
+          position: i + 1,
+          gender: requiredGender,
+          sceneTag,
+        })
         
         // Intentar sin filtro de escenario
         let fallbackQuery = supabase
@@ -396,7 +366,14 @@ export class SuspectService {
 
         const { data: fallbackData, error: fallbackError } = await fallbackQuery
 
-        if (!fallbackError && fallbackData) {
+        if (fallbackError) {
+          console.error('[suspects] gender fallback query failed', {
+            ...baseLog,
+            position: i + 1,
+            gender: requiredGender,
+            supabase: describePostgrestError(fallbackError),
+          })
+        } else if (fallbackData) {
           const fallbackAvailable = fallbackData
             .filter(s => !usedIds.has(s.id))
             .sort(() => Math.random() - 0.5)
@@ -405,12 +382,15 @@ export class SuspectService {
             const selected = fallbackAvailable[0]
             result.push(selected)
             usedIds.add(selected.id)
-            console.log(`  ✅ Position ${i + 1}: Selected ${selected.gender} (${selected.occupation?.es || selected.occupation})`)
             continue
           }
         }
 
-        console.error(`❌ No ${requiredGender} suspects available at all for position ${i + 1}`)
+        console.error('[suspects] no suspects for gender slot', {
+          ...baseLog,
+          position: i + 1,
+          gender: requiredGender,
+        })
         // Si no hay del género requerido, no podemos continuar
         throw new Error(`No se encontraron suficientes sospechosos del género "${requiredGender}" para la posición ${i + 1}. Por favor, intenta con otro género o escenario.`)
       }
@@ -418,12 +398,14 @@ export class SuspectService {
       const selected = available[0]
       result.push(selected)
       usedIds.add(selected.id)
-      console.log(`  ✅ Position ${i + 1}: Selected ${selected.gender} (${selected.occupation?.es || selected.occupation})`)
     }
 
-    // Si necesitamos más sospechosos que géneros especificados, obtener los restantes sin filtro de género
     if (result.length < count) {
-      console.log(`📊 Need ${count - result.length} more suspects (no gender specified for these positions)`)
+      console.warn('[suspects] gender mode shortfall; topping up', {
+        ...baseLog,
+        have: result.length,
+        need: count,
+      })
       
       let extraQuery = supabase
         .from('suspects')
@@ -440,7 +422,12 @@ export class SuspectService {
 
       const { data: extraData, error: extraError } = await extraQuery
 
-      if (!extraError && extraData) {
+      if (extraError) {
+        console.error('[suspects] gender top-up query failed', {
+          ...baseLog,
+          supabase: describePostgrestError(extraError),
+        })
+      } else if (extraData) {
         const extraAvailable = extraData
           .filter(s => !usedIds.has(s.id))
           .sort(() => Math.random() - 0.5)
@@ -448,15 +435,20 @@ export class SuspectService {
 
         result.push(...extraAvailable)
         extraAvailable.forEach(s => usedIds.add(s.id))
-        console.log(`✅ Added ${extraAvailable.length} additional suspects`)
       }
     }
 
-    console.log(`🎯 FINAL RESULT (Gender-filtered): ${result.length} suspects`)
-    result.forEach((suspect, index) => {
-      const expectedGender = preferredGenders[index] || 'any'
-      const match = suspect.gender?.toLowerCase() === expectedGender.toLowerCase() ? '✅' : '⚠️'
-      console.log(`  ${index + 1}. ${suspect.gender || 'NO_GENDER'} ${match} (expected: ${expectedGender}) - ${suspect.occupation?.es || suspect.occupation}`)
+    const genderMismatches = result.filter(
+      (s, idx) =>
+        preferredGenders[idx] &&
+        s.gender?.toLowerCase() !== preferredGenders[idx].toLowerCase()
+    ).length
+
+    console.log('[suspects] ok (gender-filtered)', {
+      ...baseLog,
+      returned: result.length,
+      ids: result.map(s => s.id),
+      genderMismatches,
     })
 
     return result
